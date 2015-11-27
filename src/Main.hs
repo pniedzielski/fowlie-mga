@@ -1,4 +1,5 @@
 --
+-- Copyright © 2015, Patrick M. Niedzielski.
 -- This file is part of fowlie-mga
 --
 -- fowlie-mga is free software: you can redistribute it and/or modify

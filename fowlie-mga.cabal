@@ -6,7 +6,7 @@ license:             GPL-3
 license-file:        LICENSE
 author:              Patrick M. Niedzielski
 maintainer:          pmn25@cornell.edu
--- copyright:           
+copyright:           Copyright © 2015, Patrick M. Niedzielski.
 category:            Language
 build-type:          Simple
 -- extra-source-files:
