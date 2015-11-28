@@ -17,12 +17,15 @@
 --
 
 {-# LANGUAGE UnicodeSyntax #-}
+{-# LANGUAGE MultiWayIf    #-}
 
 module Main( main ) where
 
 import System.Environment
 import Data.Maybe
+import Data.Matrix
 import Data.Char
+import Data.List
 import Prelude.Unicode
 import Control.Monad.Unicode
 
@@ -177,8 +180,45 @@ grammar =
 --------------------------------------------------------------------------------
 
 
-parseTokens ∷ [Token] → Maybe ()
-parseTokens _ = Just ()
+type ChartEntry = (ℕ, [Feature])
+
+parseTokens ∷ [Token] → Maybe [ChartEntry]
+parseTokens input =
+  case cky g input start end of
+  [] → Nothing
+  x  → Just x
+  where start = 0
+        end   = length input
+        g     = grammar
+
+cky ∷ Grammar → [Token] → ℕ → ℕ → [ChartEntry]
+cky g input start end
+  | end < start     = []
+  | end ≡ start     = []  -- Empty categories here
+  | end - start ≡ 1 = fmap (\x → (-1, x)) lexicalItems
+  | otherwise       = nub $ findConstituents
+  where token            = input !! start
+        lexicalItems     = fmap featuresOf $ findInLexicon token g
+        findConstituents = do
+          midpoint ← [(start + 1) .. (end - 1)]
+          (lhsMid, lhs) ← cky g input start midpoint
+          (rhsMid, rhs) ← cky g input midpoint end
+          let lhsIsLexical = lhsMid ≡ -1
+          let rhsIsLexical = rhsMid ≡ -1
+          if | lhs `selects` rhs ∧ lhsIsLexical     →
+                 [(midpoint, satisfyMerge lhs)]  -- merge complement
+             | rhs `selects` lhs ∧ not rhsIsLexical →
+                 [(midpoint, satisfyMerge rhs)]  -- merge specifier
+             | otherwise                            → []
+
+full_chart ∷ Grammar -> [Token] → Matrix [ChartEntry]
+full_chart g input = fromLists $ do
+  x ← [0..end]
+  return $
+    do
+      y ← [0..end]
+      return $ cky g input x y
+        where end = length input
 
 
 --------------------------------------------------------------------------------
