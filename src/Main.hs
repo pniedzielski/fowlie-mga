@@ -31,7 +31,30 @@ import Control.Monad.Unicode
 
 
 --------------------------------------------------------------------------------
---                                                          PROGRAM STRUCTURE --
+--                                                       0. TABLE OF CONTENTS --
+--------------------------------------------------------------------------------
+
+
+{-
+
+This program is divided into the following sections:
+
+0. TABLE OF CONTENTS  This section
+1. PROGRAM STRUCTURE  The application main function
+2. UTILITIES          Generic utilities used throughout the program
+3. TOKENIZATION       Tokenization functionality
+4. FEATURES           Selectional and Licensing feature types
+5. LEXICON            Lexical items, with associated features
+6. GRAMMAR            A lexicon and a set of start symbols
+7. PARSING            CKY parser for MGs
+8. RECOGNITION        Recognizer for MGs
+9. USER-FACING        Helpful functions for the user to use
+
+-}
+
+
+--------------------------------------------------------------------------------
+--                                                       1. PROGRAM STRUCTURE --
 --------------------------------------------------------------------------------
 
 
@@ -57,7 +80,7 @@ main = getInputs ≫= putStr ∘ unlines ∘ fmap (show ∘ parse)
 
 
 --------------------------------------------------------------------------------
---                                                                  UTILITIES --
+--                                                               2. UTILITIES --
 --------------------------------------------------------------------------------
 
 
@@ -77,7 +100,7 @@ nullToNothing x  = Just x
 
 
 --------------------------------------------------------------------------------
---                                                               TOKENIZATION --
+--                                                            3. TOKENIZATION --
 --------------------------------------------------------------------------------
 
 
@@ -94,7 +117,7 @@ tokenize = words ∘ fmap toLower  -- normalize to lowercase and then
 
 
 --------------------------------------------------------------------------------
---                                                                   FEATURES --
+--                                                                4. FEATURES --
 --------------------------------------------------------------------------------
 
 
@@ -138,7 +161,7 @@ satisfyMerge = tail
 
 
 --------------------------------------------------------------------------------
---                                                                    LEXICON --
+--                                                                 5. LEXICON --
 --------------------------------------------------------------------------------
 
 
@@ -168,7 +191,7 @@ type Lexicon = [LexicalItem]
 
 
 --------------------------------------------------------------------------------
---                                                                    GRAMMAR --
+--                                                                 6. GRAMMAR --
 --------------------------------------------------------------------------------
 
 
@@ -207,7 +230,7 @@ grammar =
 
 
 --------------------------------------------------------------------------------
---                                                                    PARSING --
+--                                                                 7. PARSING --
 --------------------------------------------------------------------------------
 
 
@@ -291,7 +314,7 @@ full_chart g input = fromLists $ do
 
 
 --------------------------------------------------------------------------------
---                                                                RECOGNITION --
+--                                                             8. RECOGNITION --
 --------------------------------------------------------------------------------
 
 
@@ -302,7 +325,7 @@ recognizeTokens = isJust ∘ parseTokens
 
 
 --------------------------------------------------------------------------------
---                                                               USER-FACING  --
+--                                                            9. USER-FACING  --
 --------------------------------------------------------------------------------
 
 
