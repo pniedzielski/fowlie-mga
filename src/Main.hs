@@ -27,6 +27,7 @@ import Data.Matrix
 import Data.Char
 import Data.List
 import Prelude.Unicode
+import Control.Applicative
 import Control.Monad.Unicode
 
 
@@ -90,6 +91,7 @@ main = getInputs ≫= putStr ∘ unlines ∘ fmap (show ∘ parse)
 type ℕ = Int
 
 -- | 'ε' is the empty string.
+ε ∷ String
 ε = ""
 
 -- | 'nullToNothing' maps an empty list to Nothing and a nonempty list
@@ -150,7 +152,7 @@ instance Show Feature where
 -- This is only true when the head of the lefthand features list is a
 -- selector for the head of the righthand features list.
 selects ∷ [Feature] → [Feature] → Bool
-selects ((Selector f):_) ((Category f'):_) = f ≡ f'
+selects (Selector f : _) (Category f' : _) = f ≡ f'
 selects _ _                                = False
 
 -- | 'satisfyMerge' removes the first feature from a list of features.
@@ -267,7 +269,7 @@ cky g input start end
   | invalidCell     = []
   | emptyCatCell    = emptyItemEntries
   | lexicalCell     = lexicalItemEntries
-  | otherwise       = nub $ findConstituents
+  | otherwise       = nub constituents
   where
     -- What type of cell is (start, end)?
     invalidCell  = end < start      -- Unused cell
@@ -276,35 +278,37 @@ cky g input start end
     -- Convert lexical items to chart entries
     lexicalToChart     = LexicalEntry ∘ featuresOf
     -- All empty items.
-    emptyItemEntries   = fmap lexicalToChart $ emptyItems g
+    emptyItemEntries   = lexicalToChart <$> emptyItems g
     -- All lexical items that are homophonous with token.  This allows
     -- us to capture lexical ambiguity.
     lexicalItemEntries = fmap lexicalToChart lexicalItems
     lexicalItems       = findInLexicon token g
     token              = input !! start
     -- Finds all possible constituents.
-    findConstituents = do
-      midpoint ← [(start + 1) .. (end - 1)]
-      lhs ← cky g input start midpoint
-      rhs ← cky g input midpoint end
-      tryMergeComplement midpoint lhs rhs ⧺ tryMergeSpecifier midpoint lhs rhs
+    constituents       =
+      do
+        midpoint ← [(start + 1) .. (end - 1)]
+        lhs ← cky g input start midpoint
+        rhs ← cky g input midpoint end
+        tryMergeComplement    midpoint lhs rhs
+          ⧺ tryMergeSpecifier midpoint lhs rhs
     -- Try to satisfy a Merge by merging in a complement.  We can only
     -- do this if the lhs is a lexical entry and selects the rhs.
     tryMergeComplement midpoint (LexicalEntry lhsFeatures) rhs
-      | lhsFeatures `selects` (entryFeatures rhs) =
+      | lhsFeatures `selects` entryFeatures rhs =
           [MergeEntry (midpoint, satisfyMerge lhsFeatures)]
       | otherwise = []
     tryMergeComplement _ _ _ = []
     -- Try to satisfy a Merge by merging in a specifier.  We can only
     -- do this if the rhs is not a lexical entry and selects the lhs.
     tryMergeSpecifier midpoint lhs (MergeEntry (_, rhsFeatures))
-      | rhsFeatures `selects` (entryFeatures lhs) =
+      | rhsFeatures `selects` entryFeatures lhs =
           [MergeEntry (midpoint, satisfyMerge rhsFeatures)]
       | otherwise = []
     tryMergeSpecifier _ _ _ = []
 
-full_chart ∷ Grammar -> [Token] → Matrix [ChartEntry]
-full_chart g input = fromLists $ do
+fullChart ∷ Grammar -> [Token] → Matrix [ChartEntry]
+fullChart g input = fromLists $ do
   x ← [0..end]
   return $
     do
