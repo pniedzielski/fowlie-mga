@@ -69,6 +69,12 @@ type ℕ = Int
 -- | 'ε' is the empty string.
 ε = ""
 
+-- | 'nullToNothing' maps an empty list to Nothing and a nonempty list
+-- to Just that list.
+nullToNothing ∷ [α] → Maybe [α]
+nullToNothing [] = Nothing
+nullToNothing x  = Just x
+
 
 --------------------------------------------------------------------------------
 --                                                               TOKENIZATION --
@@ -150,14 +156,25 @@ featuresOf (LexicalItem (_, features)) = features
 tokenOf ∷ LexicalItem → Token
 tokenOf (LexicalItem (token, _)) = token
 
--- | A 'Grammar' is just a lexicon in MG.
-type Grammar = [LexicalItem]
+-- | A 'Lexicon' is simply a list of lexical entries, with no
+-- duplcates.
+type Lexicon = [LexicalItem]
+-- | A 'Grammar' is just a lexicon and a set of start symbols in MG.
+type Grammar = ([Selectional], Lexicon)
+
+-- | 'lexicon' returns a grammar's lexicon
+lexicon ∷ Grammar → Lexicon
+lexicon (_, l) = l
+
+-- | 'startSymbols' returns a grammar's set of start symbols.
+startSymbols ∷ Grammar → [Selectional]
+startSymbols (s, _) = s
 
 -- | 'findInLexicon' returns a list of all lexical items with the
 -- given surface form.  Because we allow homophony in our lexicon,
 -- this has to return a list.
 findInLexicon ∷ Token → Grammar → [LexicalItem]
-findInLexicon t = filter (\x → tokenOf x ≡ t)
+findInLexicon t = filter (\x → tokenOf x ≡ t) ∘ lexicon
 
 -- | 'emptyItems' returns a list of all lexical items with no surface
 -- form (i.e., such that the surface form is ε).
@@ -167,12 +184,13 @@ emptyItems = findInLexicon ""
 -- | 'grammar' is a test grammar.
 grammar ∷ Grammar
 grammar =
-  [ LexicalItem( "fox",   [Category "N"]               )
-  , LexicalItem( "the",   [Selector "N", Category "D"] )
-  , LexicalItem( "marie", [Category "D"] )
-  , LexicalItem( "pierre", [Category "D"] )
-  , LexicalItem( "praises", [Selector "D", Selector "D", Category "V"] )
-  ]
+  (["V"],
+   [ LexicalItem( "fox",     [Category "N"]                             )
+   , LexicalItem( "the",     [Selector "N", Category "D"]               )
+   , LexicalItem( "marie",   [Category "D"]                             )
+   , LexicalItem( "pierre",  [Category "D"]                             )
+   , LexicalItem( "praises", [Selector "D", Selector "D", Category "V"] )
+   ])
 
 
 --------------------------------------------------------------------------------
@@ -180,36 +198,74 @@ grammar =
 --------------------------------------------------------------------------------
 
 
-type ChartEntry = (ℕ, [Feature])
+data ChartEntry = LexicalEntry [Feature]
+                | MergeEntry (ℕ, [Feature])
+                deriving( Show, Eq )
+
+entryFeatures ∷ ChartEntry → [Feature]
+entryFeatures (LexicalEntry f)    = f
+entryFeatures (MergeEntry (_, f)) = f
+
+partialParseTokens ∷ [Token] → Maybe [ChartEntry]
+partialParseTokens input =
+  nullToNothing parseResults
+    where parseResults = cky g input start end
+          start        = 0
+          end          = length input
+          g            = grammar
 
 parseTokens ∷ [Token] → Maybe [ChartEntry]
 parseTokens input =
-  case cky g input start end of
-  [] → Nothing
-  x  → Just x
-  where start = 0
-        end   = length input
-        g     = grammar
+     partialParseTokens input
+  ≫= nullToNothing ∘ filter isValidParse
+    where isValidParse = isStartSymbol g
+          g            = grammar
+
+isStartSymbol ∷ Grammar → ChartEntry → Bool
+isStartSymbol g (LexicalEntry     [Category f])  = f ∈ startSymbols g
+isStartSymbol g (MergeEntry   (_, [Category f])) = f ∈ startSymbols g
+isStartSymbol _ _                                = False
 
 cky ∷ Grammar → [Token] → ℕ → ℕ → [ChartEntry]
 cky g input start end
-  | end < start     = []
-  | end ≡ start     = []  -- Empty categories here
-  | end - start ≡ 1 = fmap (\x → (-1, x)) lexicalItems
+  | invalidCell     = []
+  | emptyCatCell    = emptyItemEntries
+  | lexicalCell     = lexicalItemEntries
   | otherwise       = nub $ findConstituents
-  where token            = input !! start
-        lexicalItems     = fmap featuresOf $ findInLexicon token g
-        findConstituents = do
-          midpoint ← [(start + 1) .. (end - 1)]
-          (lhsMid, lhs) ← cky g input start midpoint
-          (rhsMid, rhs) ← cky g input midpoint end
-          let lhsIsLexical = lhsMid ≡ -1
-          let rhsIsLexical = rhsMid ≡ -1
-          if | lhs `selects` rhs ∧ lhsIsLexical     →
-                 [(midpoint, satisfyMerge lhs)]  -- merge complement
-             | rhs `selects` lhs ∧ not rhsIsLexical →
-                 [(midpoint, satisfyMerge rhs)]  -- merge specifier
-             | otherwise                            → []
+  where
+    -- What type of cell is (start, end)?
+    invalidCell  = end < start      -- Unused cell
+    emptyCatCell = start ≡ end      -- ε entries
+    lexicalCell  = end - start ≡ 1  -- Lexical entries
+    -- Convert lexical items to chart entries
+    lexicalToChart     = LexicalEntry ∘ featuresOf
+    -- All empty items.
+    emptyItemEntries   = fmap lexicalToChart $ emptyItems g
+    -- All lexical items that are homophonous with token.  This allows
+    -- us to capture lexical ambiguity.
+    lexicalItemEntries = fmap lexicalToChart lexicalItems
+    lexicalItems       = findInLexicon token g
+    token              = input !! start
+    -- Finds all possible constituents.
+    findConstituents = do
+      midpoint ← [(start + 1) .. (end - 1)]
+      lhs ← cky g input start midpoint
+      rhs ← cky g input midpoint end
+      tryMergeComplement midpoint lhs rhs ⧺ tryMergeSpecifier midpoint lhs rhs
+    -- Try to satisfy a Merge by merging in a complement.  We can only
+    -- do this if the lhs is a lexical entry and selects the rhs.
+    tryMergeComplement midpoint (LexicalEntry lhsFeatures) rhs
+      | lhsFeatures `selects` (entryFeatures rhs) =
+          [MergeEntry (midpoint, satisfyMerge lhsFeatures)]
+      | otherwise = []
+    tryMergeComplement _ _ _ = []
+    -- Try to satisfy a Merge by merging in a specifier.  We can only
+    -- do this if the rhs is not a lexical entry and selects the lhs.
+    tryMergeSpecifier midpoint lhs (MergeEntry (_, rhsFeatures))
+      | rhsFeatures `selects` (entryFeatures lhs) =
+          [MergeEntry (midpoint, satisfyMerge rhsFeatures)]
+      | otherwise = []
+    tryMergeSpecifier _ _ _ = []
 
 full_chart ∷ Grammar -> [Token] → Matrix [ChartEntry]
 full_chart g input = fromLists $ do
@@ -237,5 +293,6 @@ recognizeTokens = isJust ∘ parseTokens
 --------------------------------------------------------------------------------
 
 
-parse     = parseTokens     ∘ tokenize
-recognize = recognizeTokens ∘ tokenize
+parse        = parseTokens        ∘ tokenize
+partialParse = partialParseTokens ∘ tokenize
+recognize    = recognizeTokens    ∘ tokenize
