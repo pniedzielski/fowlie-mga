@@ -22,6 +22,7 @@ module Main( main ) where
 
 import System.Environment
 import Data.Maybe
+import Data.Char
 import Prelude.Unicode
 import Control.Monad.Unicode
 
@@ -57,10 +58,16 @@ main = getInputs ≫= putStr ∘ unlines ∘ fmap (show ∘ parse)
 --------------------------------------------------------------------------------
 
 
+-- | 'Token' is the orthographic representation of a lexical item.  It
+-- is normalized to all lowercase characters, and has no internal
+-- whitespace.
 type Token = String
 
+-- | 'tokenize' takes an input string and returns a list of its
+-- tokens.
 tokenize ∷ String → [Token]
-tokenize = words
+tokenize = words ∘ fmap toLower  -- normalize to lowercase and then
+                                 -- split on space
 
 
 --------------------------------------------------------------------------------
