@@ -121,6 +121,12 @@ selects ∷ [Feature] → [Feature] → Bool
 selects ((Selector f):_) ((Category f'):_) = f ≡ f'
 selects _ _                                = False
 
+-- | 'satisfyMerge' removes the first feature from a list of features.
+-- Precondition: this feature set selects another feature set in a
+-- Merge operation.
+satisfyMerge ∷ [Feature] → [Feature]
+satisfyMerge = tail
+
 -- | A 'LexicalItem' is a pairing of an orthographic representation
 -- that appears in the surface string and a list of features that must
 -- be checked in a valid parse.
