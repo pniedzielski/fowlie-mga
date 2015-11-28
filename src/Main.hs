@@ -100,6 +100,16 @@ nullToNothing ∷ [α] → Maybe [α]
 nullToNothing [] = Nothing
 nullToNothing x  = Just x
 
+-- | 'stabilize' returns the cycle of a transformation 't' that has a
+-- single value cycle when applied to 'initial'.  Precondition: 't'^𝓃
+-- applied to 'initial' describes an orbit over a subset of α with a
+-- cycle that contains a single value.
+stablize ∷ Eq α ⇒ (α → α) → α → α
+stablize f initial
+  | initial' ≡ initial = initial
+  | otherwise          = stablize f initial'
+  where initial' = f initial
+
 
 --------------------------------------------------------------------------------
 --                                                            3. TOKENIZATION --
@@ -147,20 +157,6 @@ instance Show Feature where
   show (Licensor f) = "+" ⧺ f
   show (Licensee f) = "-" ⧺ f
 
--- | 'selects' returns whether an atom with a given list of
--- features can merge with an atom with another list of features.
--- This is only true when the head of the lefthand features list is a
--- selector for the head of the righthand features list.
-selects ∷ [Feature] → [Feature] → Bool
-selects (Selector f : _) (Category f' : _) = f ≡ f'
-selects _ _                                = False
-
--- | 'satisfyMerge' removes the first feature from a list of features.
--- Precondition: this feature set selects another feature set in a
--- Merge operation.
-satisfyMerge ∷ [Feature] → [Feature]
-satisfyMerge = tail
-
 
 --------------------------------------------------------------------------------
 --                                                                 5. LEXICON --
@@ -170,22 +166,22 @@ satisfyMerge = tail
 -- | A 'LexicalItem' is a pairing of an orthographic representation
 -- that appears in the surface string and a list of features that must
 -- be checked in a valid parse.
-data LexicalItem = LexicalItem (Token, [Feature])
+data LexicalItem = LexicalItem( Token, [Feature] )
                  deriving( Eq )
 
 instance Show LexicalItem where
-  show (LexicalItem (token, features)) = token ⧺ " ∷ " ⧺ featureString
-    where featureString = unwords $ fmap show features
+  show (LexicalItem( token, f )) = token ⧺ " ∷ " ⧺ featureString
+    where featureString = unwords $ fmap show f
 
 -- | 'featuresOf' returns the list of features associated with a
 -- lexical item.
 featuresOf ∷ LexicalItem → [Feature]
-featuresOf (LexicalItem (_, features)) = features
+featuresOf (LexicalItem( _, f )) = f
 
 -- | 'tokenOf' returns the surface form associated with a lexical
 -- item.
 tokenOf ∷ LexicalItem → Token
-tokenOf (LexicalItem (token, _)) = token
+tokenOf (LexicalItem( token, _ )) = token
 
 -- | A 'Lexicon' is simply a list of lexical entries, with no
 -- duplcates.
@@ -235,22 +231,82 @@ grammar =
 --                                                                 7. PARSING --
 --------------------------------------------------------------------------------
 
+-- | Each chain has a 'Type' that is either 'Lexical' or 'Derived'.
+-- 'Lexical' chains consist only of lexical items, whereas 'Derived'
+-- chains are the result of a merge or move operation.
+data Type = Lexical | Derived
+          deriving( Eq, Ord, Show )
 
-data ChartEntry = LexicalEntry [Feature]
-                | MergeEntry (ℕ, [Feature])
+-- | A 'Chain' is a contiguous forest (represented as a start and end
+-- pair in the chart), a type, and a set of features.
+data Chain = Chain( (ℕ, ℕ), Type, [Feature] )
+           deriving( Eq )
+
+instance Show Chain where
+  show (Chain( pos, t, fs) ) =
+    show pos ⧺ showNoCoords (Chain (pos, t, fs))
+
+showNoCoords ∷ Chain → String
+showNoCoords (Chain( _, Lexical, fs )) = foldl (⧺) "𝓁 " $ fmap show fs
+showNoCoords (Chain( _, Derived, fs )) = foldl (⧺) ε    $ fmap show fs
+
+-- | An 'Expression' is a non-empty list of chains.  An invalid
+-- expression (formed by calling 'merge' or 'move' on arguments not
+-- within its definition space) is represented by an empty list.
+type Expression = [Chain]
+
+data ChartEntry = ChartEntry Expression
                 deriving( Eq )
 
 instance Show ChartEntry where
-  show (LexicalEntry f)    = foldl (⧺) "ₗ " $ fmap show f
-  show (MergeEntry (_, f)) = foldl (⧺) ε   $ fmap show f
+  show (ChartEntry( [] ))     = ""
+  show (ChartEntry( x : xs )) = showNoCoords x ⧺ show' xs
+    where show' [] = ε
+          show' xs = " " ⧺ (unwords $ fmap show xs)
 
-entryFeatures ∷ ChartEntry → [Feature]
-entryFeatures (LexicalEntry f)    = f
-entryFeatures (MergeEntry (_, f)) = f
+-- | 'merge' Takes a left-hand chart entry and a right-hand chart
+-- entry and attempts to merge them according to the three MG merge
+-- functions.  If the merge fails, we return an empty list.
+merge ∷ Expression → Expression → Expression
+
+-- merge1: merge lexical entry with something else
+merge ( Chain( (s, _),   Lexical,   Selector f  : γ  ) : [] )
+      ( Chain( (_, e),         _,   Category f' : [] ) : αs )
+  | f ≡ f'   = newExpr
+  | otherwise = []
+  where newChain = Chain( (s, e), Derived, γ )
+        newExpr  = [newChain] ⧺ αs
+
+-- merge2: merge something with derived entry
+merge ( Chain( (s, _),         _,   Category f  : [] ) : βs )
+      ( Chain( (_, e),   Derived,   Selector f' : γ  ) : αs )
+  | f ≡ f'   = newExpr
+  | otherwise = []
+  where newChain = Chain( (s, e), Derived, γ )
+        newExpr = [newChain] ⧺ αs ⧺ βs
+
+-- merge3: merge two things with further requirements
+merge ( Chain( pos ,          t ,   Category f  : γ  ) : βs )
+      ( Chain( pos',          t',   Selector f' : δ  ) : αs )
+  | f ≡ f'   = newExpr
+  | otherwise = []
+  where newChain  = Chain( pos', t', δ )
+        newChain' = Chain( pos , t , γ )
+        newExpr   = [newChain] ⧺ αs ⧺ [newChain'] ⧺ βs
+merge ( Chain( pos',          t',   Selector f' : δ  ) : αs )
+      ( Chain( pos ,          t ,   Category f  : γ  ) : βs )
+  | f ≡ f'   = newExpr
+  | otherwise = []
+  where newChain  = Chain( pos', t', δ )
+        newChain' = Chain( pos , t , γ )
+        newExpr   = [newChain] ⧺ αs ⧺ [newChain'] ⧺ βs
+
+-- otherwise, don't merge
+merge _ _ = []
 
 partialParseTokens ∷ [Token] → Maybe [ChartEntry]
 partialParseTokens input =
-  nullToNothing parseResults
+  nullToNothing $ ChartEntry <$> parseResults
     where parseResults = cky g input start end
           start        = 0
           end          = length input
@@ -259,28 +315,27 @@ partialParseTokens input =
 parseTokens ∷ [Token] → Maybe [ChartEntry]
 parseTokens input =
      partialParseTokens input
-  ≫= nullToNothing ∘ filter isValidParse
+  ≫= nullToNothing ∘ filter (\(ChartEntry x) → isValidParse x)
     where isValidParse = isStartSymbol g
           g            = grammar
 
-isStartSymbol ∷ Grammar → ChartEntry → Bool
-isStartSymbol g (LexicalEntry     [Category f])  = f ∈ startSymbols g
-isStartSymbol g (MergeEntry   (_, [Category f])) = f ∈ startSymbols g
-isStartSymbol _ _                                = False
+isStartSymbol ∷ Grammar → Expression → Bool
+isStartSymbol g [Chain (_, _, [Category f])] = f ∈ startSymbols g
+isStartSymbol _ _                            = False
 
-cky ∷ Grammar → [Token] → ℕ → ℕ → [ChartEntry]
+cky ∷ Grammar → [Token] → ℕ → ℕ → [Expression]
 cky g input start end
   | invalidCell     = []
   | emptyCatCell    = emptyItemEntries
   | lexicalCell     = lexicalItemEntries
-  | otherwise       = nub constituents
+  | otherwise       = stablize (nub ∘ mergeWithEmpties) constituents
   where
     -- What type of cell is (start, end)?
     invalidCell  = end < start      -- Unused cell
     emptyCatCell = start ≡ end      -- ε entries
     lexicalCell  = end - start ≡ 1  -- Lexical entries
     -- Convert lexical items to chart entries
-    lexicalToChart     = LexicalEntry ∘ featuresOf
+    lexicalToChart l    = [Chain ((start, end), Lexical, featuresOf l)]
     -- All empty items.
     emptyItemEntries   = lexicalToChart <$> emptyItems g
     -- All lexical items that are homophonous with token.  This allows
@@ -292,32 +347,22 @@ cky g input start end
     constituents       =
       do
         midpoint ← [(start + 1) .. (end - 1)]
-        lhs ← cky g input start midpoint
-        rhs ← cky g input midpoint end
-        tryMergeComplement    midpoint lhs rhs
-          ⧺ tryMergeSpecifier midpoint lhs rhs
-    -- Try to satisfy a Merge by merging in a complement.  We can only
-    -- do this if the lhs is a lexical entry and selects the rhs.
-    tryMergeComplement midpoint (LexicalEntry lhsFeatures) rhs
-      | lhsFeatures `selects` entryFeatures rhs =
-          [MergeEntry (midpoint, satisfyMerge lhsFeatures)]
-      | otherwise = []
-    tryMergeComplement _ _ _ = []
-    -- Try to satisfy a Merge by merging in a specifier.  We can only
-    -- do this if the rhs is not a lexical entry and selects the lhs.
-    tryMergeSpecifier midpoint lhs (MergeEntry (_, rhsFeatures))
-      | rhsFeatures `selects` entryFeatures lhs =
-          [MergeEntry (midpoint, satisfyMerge rhsFeatures)]
-      | otherwise = []
-    tryMergeSpecifier _ _ _ = []
+        lhs      ← cky g input start midpoint
+        rhs      ← cky g input midpoint end
+        return $ merge lhs rhs
+    mergeWithEmpties items =
+      items ⧺ do
+        lhs      ← cky g input start start
+        rhs      ← items
+        return $ merge lhs rhs
 
 fullChart ∷ Grammar -> [Token] → Matrix [ChartEntry]
-fullChart g input = fromLists $ do
+fullChart g input = fmap (fmap ChartEntry) $ fromLists $ do
   x ← [0..end]
   return $
     do
       y ← [0..end]
-      return $ cky g input x y
+      return $ filter (not ∘ null) $ cky g input x y
         where end = length input
 
 
