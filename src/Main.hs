@@ -54,6 +54,20 @@ main = getInputs ≫= putStr ∘ unlines ∘ fmap (show ∘ parse)
 
 
 --------------------------------------------------------------------------------
+--                                                                  UTILITIES --
+--------------------------------------------------------------------------------
+
+
+-- | 'ℕ' is the natural numbers.  For efficiency, this is just an alias
+-- for ℤ, and its only purpose in life is to make it a little clearer
+-- that we don't want negative numbers.
+type ℕ = Int
+
+-- | 'ε' is the empty string.
+ε = ""
+
+
+--------------------------------------------------------------------------------
 --                                                               TOKENIZATION --
 --------------------------------------------------------------------------------
 
