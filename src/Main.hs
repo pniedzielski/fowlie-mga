@@ -147,6 +147,30 @@ featuresOf (LexicalItem (_, features)) = features
 tokenOf ∷ LexicalItem → Token
 tokenOf (LexicalItem (token, _)) = token
 
+-- | A 'Grammar' is just a lexicon in MG.
+type Grammar = [LexicalItem]
+
+-- | 'findInLexicon' returns a list of all lexical items with the
+-- given surface form.  Because we allow homophony in our lexicon,
+-- this has to return a list.
+findInLexicon ∷ Token → Grammar → [LexicalItem]
+findInLexicon t = filter (\x → tokenOf x ≡ t)
+
+-- | 'emptyItems' returns a list of all lexical items with no surface
+-- form (i.e., such that the surface form is ε).
+emptyItems ∷ Grammar → [LexicalItem]
+emptyItems = findInLexicon ""
+
+-- | 'grammar' is a test grammar.
+grammar ∷ Grammar
+grammar =
+  [ LexicalItem( "fox",   [Category "N"]               )
+  , LexicalItem( "the",   [Selector "N", Category "D"] )
+  , LexicalItem( "marie", [Category "D"] )
+  , LexicalItem( "pierre", [Category "D"] )
+  , LexicalItem( "praises", [Selector "D", Selector "D", Category "V"] )
+  ]
+
 
 --------------------------------------------------------------------------------
 --                                                                    PARSING --
