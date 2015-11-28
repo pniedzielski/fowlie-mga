@@ -94,7 +94,7 @@ tokenize = words ∘ fmap toLower  -- normalize to lowercase and then
 
 
 --------------------------------------------------------------------------------
---                                                                    GRAMMAR --
+--                                                                   FEATURES --
 --------------------------------------------------------------------------------
 
 
@@ -136,6 +136,12 @@ selects _ _                                = False
 satisfyMerge ∷ [Feature] → [Feature]
 satisfyMerge = tail
 
+
+--------------------------------------------------------------------------------
+--                                                                    LEXICON --
+--------------------------------------------------------------------------------
+
+
 -- | A 'LexicalItem' is a pairing of an orthographic representation
 -- that appears in the surface string and a list of features that must
 -- be checked in a valid parse.
@@ -159,6 +165,13 @@ tokenOf (LexicalItem (token, _)) = token
 -- | A 'Lexicon' is simply a list of lexical entries, with no
 -- duplcates.
 type Lexicon = [LexicalItem]
+
+
+--------------------------------------------------------------------------------
+--                                                                    GRAMMAR --
+--------------------------------------------------------------------------------
+
+
 -- | A 'Grammar' is just a lexicon and a set of start symbols in MG.
 type Grammar = ([Selectional], Lexicon)
 
