@@ -113,13 +113,13 @@ instance Show Feature where
   show (Licensor f) = "+" ⧺ f
   show (Licensee f) = "-" ⧺ f
 
--- | 'canMergeWith' returns whether an atom with a given list of
+-- | 'selects' returns whether an atom with a given list of
 -- features can merge with an atom with another list of features.
 -- This is only true when the head of the lefthand features list is a
 -- selector for the head of the righthand features list.
-canMergeWith ∷ [Feature] → [Feature] → Bool
-canMergeWith ((Selector f):_) ((Category f'):_) = f ≡ f'
-canMergeWith _ _                                = False
+selects ∷ [Feature] → [Feature] → Bool
+selects ((Selector f):_) ((Category f'):_) = f ≡ f'
+selects _ _                                = False
 
 -- | A 'LexicalItem' is a pairing of an orthographic representation
 -- that appears in the surface string and a list of features that must
