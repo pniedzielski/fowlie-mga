@@ -23,6 +23,7 @@ module Main( main ) where
 import System.Environment
 import Data.Maybe
 import Prelude.Unicode
+import Control.Monad.Unicode
 
 
 --------------------------------------------------------------------------------
@@ -30,12 +31,25 @@ import Prelude.Unicode
 --------------------------------------------------------------------------------
 
 
--- | 'main' is the entry point of the program
+-- | 'main' is the entry point of the program.  It reads each of its
+-- command line arguments, parses each according to the grammar, and
+-- prints the results to standard out.  If there are no command line
+-- arguments, then each line of standard in is used instead.
 main ∷ IO ()
-main = do
-  args ← getArgs
-  let parses = fmap parse args
-  print $ show parses
+main = getInputs ≫= putStr ∘ unlines ∘ fmap (show ∘ parse)
+  where
+    -- Return command line arguments if there are any, and stdin lines
+    -- otherwise.
+    getInputs = do
+      args  ← getArgs
+      stdin ← getLines
+      return $ selectNotNull args stdin
+    -- Return the first argument unless it is the empty list, in which
+    -- case return the second argument.
+    selectNotNull [] xs = xs
+    selectNotNull xs _  = xs
+    -- Return a lazy list of lines from standard in.
+    getLines = getContents ≫= return ∘ lines
 
 
 --------------------------------------------------------------------------------
