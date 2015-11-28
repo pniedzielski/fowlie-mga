@@ -192,7 +192,7 @@ findInLexicon t = filter (\x → tokenOf x ≡ t) ∘ lexicon
 -- | 'emptyItems' returns a list of all lexical items with no surface
 -- form (i.e., such that the surface form is ε).
 emptyItems ∷ Grammar → [LexicalItem]
-emptyItems = findInLexicon ""
+emptyItems = findInLexicon ε
 
 -- | 'grammar' is a test grammar.
 grammar ∷ Grammar
