@@ -218,12 +218,14 @@ emptyItems = findInLexicon ε
 -- | 'grammar' is a test grammar.
 grammar ∷ Grammar
 grammar =
-  (["V"],
-   [ LexicalItem( "fox",     [Category "N"]                             )
-   , LexicalItem( "the",     [Selector "N", Category "D"]               )
-   , LexicalItem( "marie",   [Category "D"]                             )
-   , LexicalItem( "pierre",  [Category "D"]                             )
-   , LexicalItem( "praises", [Selector "D", Selector "D", Category "V"] )
+  (["C"],
+   [ LexicalItem( "fox",     [Category "N"]                                )
+   , LexicalItem( "the",     [Selector "N", Category "D"]                  )
+   , LexicalItem( "marie",   [Category "D", Licensee "case"]               )
+   , LexicalItem( "pierre",  [Category "D"]                                )
+   , LexicalItem( "praises", [Selector "D", Selector "D", Category "V"]    )
+   , LexicalItem( ε,         [Selector "V", Licensor "case", Category "T"] )
+   , LexicalItem( ε,         [Selector "T", Category "C"]                  )
    ])
 
 
