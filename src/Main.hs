@@ -238,7 +238,11 @@ grammar =
 
 data ChartEntry = LexicalEntry [Feature]
                 | MergeEntry (ℕ, [Feature])
-                deriving( Show, Eq )
+                deriving( Eq )
+
+instance Show ChartEntry where
+  show (LexicalEntry f)    = foldl (⧺) "ₗ " $ fmap show f
+  show (MergeEntry (_, f)) = foldl (⧺) ε   $ fmap show f
 
 entryFeatures ∷ ChartEntry → [Feature]
 entryFeatures (LexicalEntry f)    = f
