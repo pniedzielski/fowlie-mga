@@ -244,27 +244,34 @@ data Type = Lexical | Derived
 data Chain = Chain( (ℕ, ℕ), Type, [Feature] )
            deriving( Eq )
 
-instance Show Chain where
-  show (Chain( pos, t, fs) ) =
-    show pos ⧺ showNoCoords (Chain (pos, t, fs))
+-- instance Show Chain where
+--   show (Chain( pos, t, fs) ) =
+--     show pos ⧺ " " ⧺ showNoCoords (Chain (pos, t, fs))
 
-showNoCoords ∷ Chain → String
-showNoCoords (Chain( _, Lexical, fs )) = foldl (⧺) "𝓁 " $ fmap show fs
-showNoCoords (Chain( _, Derived, fs )) = foldl (⧺) ε    $ fmap show fs
+showFeatures ∷ [Feature] → String
+showFeatures fs = foldl (⧺) ε $ fmap show fs
 
 -- | An 'Expression' is a non-empty list of chains.  An invalid
 -- expression (formed by calling 'merge' or 'move' on arguments not
 -- within its definition space) is represented by an empty list.
 type Expression = [Chain]
 
+-- | A 'ChartEntry' is an 'Expression' that pretty-prints.
 data ChartEntry = ChartEntry Expression
                 deriving( Eq )
 
 instance Show ChartEntry where
   show (ChartEntry( [] ))     = ""
-  show (ChartEntry( x : xs )) = showNoCoords x ⧺ show' xs
-    where show' [] = ε
-          show' xs = " " ⧺ (unwords $ fmap show xs)
+  show (ChartEntry( x : xs )) = showFirst x ⧺ showRest xs
+    where
+      -- Print out the first chain in an expression.
+      showFirst (Chain( _, _, fs ))   =             showFeatures fs
+      -- Print out the remaining chains in an expression.
+      showRest  []  = ε
+      showRest  xs' = ";" ⧺ (intercalate ";" $ fmap showRest' xs')
+      -- Print out a single chain in the tail of an expression
+      showRest' (Chain( pos, _, [] )) = ε
+      showRest' (Chain( pos, _, fs )) = show pos ⧺ showFeatures fs
 
 -- | 'merge' Takes a left-hand chart entry and a right-hand chart
 -- entry and attempts to merge them according to the three MG merge
