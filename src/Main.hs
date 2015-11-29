@@ -114,11 +114,11 @@ stablize f initial
 -- | 'modifyFirst' takes in a list, a predicate, and a transformation,
 -- and returns a new list with the first element to match the
 -- predicate modified by the given transformation.
-replaceFirst ∷ (α → Bool) → (α → α) → [α] → [α]
-replaceFirst _ _  [] = []
-replaceFirst p f (x : xs)
+modifyFirst ∷ (α → Bool) → (α → α) → [α] → [α]
+modifyFirst _ _  [] = []
+modifyFirst p f (x : xs)
   | p x       = f x : xs
-  | otherwise = x  : replaceFirst p f xs
+  | otherwise = x  : modifyFirst p f xs
 
 
 --------------------------------------------------------------------------------
