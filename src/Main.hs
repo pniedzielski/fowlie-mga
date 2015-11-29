@@ -283,6 +283,12 @@ instance Show ChartEntry where
       showRest' (Chain( pos, _, [] )) = ε
       showRest' (Chain( pos, _, fs )) = show pos ⧺ showFeatures fs
 
+{-
+
+   MERGE
+
+-}
+
 -- | 'merge' Takes a left-hand chart entry and a right-hand chart
 -- entry and attempts to merge them according to the three MG merge
 -- functions.  If the merge fails, we return an empty list.
@@ -305,20 +311,20 @@ merge ( Chain( (s, _),         _,   Category f  : [] ) : βs )
         newExpr = [newChain] ⧺ αs ⧺ βs
 
 -- merge3: merge two things with further requirements
-merge ( Chain( pos ,          t ,   Category f  : γ  ) : βs )
-      ( Chain( pos',          t',   Selector f' : δ  ) : αs )
-  | f ≡ f'   = newExpr
+merge ( Chain( pos ,          t ,   Category f  : γ : γs ) : βs )
+      ( Chain( pos',          t',   Selector f' : δ : δs ) : αs )
+  | f ≡ f'    = newExpr
   | otherwise = []
-  where newChain  = Chain( pos', t', δ )
-        newChain' = Chain( pos , t , γ )
-        newExpr   = [newChain] ⧺ αs ⧺ [newChain'] ⧺ βs
-merge ( Chain( pos',          t',   Selector f' : δ  ) : αs )
-      ( Chain( pos ,          t ,   Category f  : γ  ) : βs )
-  | f ≡ f'   = newExpr
+  where newChain  = Chain( pos , t , γ : γs )
+        newChain' = Chain( pos', t', δ : δs )
+        newExpr   = [newChain'] ⧺ αs ⧺ [newChain] ⧺ βs
+merge ( Chain( pos',          t',   Selector f' : δ : δs ) : αs )
+      ( Chain( pos ,          t ,   Category f  : γ : γs ) : βs )
+  | f ≡ f'    = newExpr
   | otherwise = []
-  where newChain  = Chain( pos', t', δ )
-        newChain' = Chain( pos , t , γ )
-        newExpr   = [newChain] ⧺ αs ⧺ [newChain'] ⧺ βs
+  where newChain  = Chain( pos , t , γ : γs )
+        newChain' = Chain( pos', t', δ : δs )
+        newExpr   = [newChain'] ⧺ αs ⧺ [newChain] ⧺ βs
 
 -- otherwise, don't merge
 merge _ _ = []
