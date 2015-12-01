@@ -110,7 +110,6 @@ stablize f initial
   | otherwise          = stablize f initial'
   where initial' = f initial
 
-
 -- | 'modifyFirst' takes in a list, a predicate, and a transformation,
 -- and returns a new list with the first element to match the
 -- predicate modified by the given transformation.
@@ -162,7 +161,7 @@ data Feature = Category Selectional
              deriving( Eq )
 
 instance Show Feature where
-  show (Category f) = f
+  show (Category f) =       f
   show (Selector f) = "=" ⧺ f
   show (Licensor f) = "+" ⧺ f
   show (Licensee f) = "-" ⧺ f
@@ -180,8 +179,8 @@ data LexicalItem = LexicalItem( Token, [Feature] )
                  deriving( Eq )
 
 instance Show LexicalItem where
-  show (LexicalItem( token, f )) = token ⧺ " ∷ " ⧺ featureString
-    where featureString = unwords $ fmap show f
+  show (LexicalItem( token, f )) = token ⧺ "∷" ⧺ featureString
+    where featureString = concat $ show <$> f
 
 -- | 'featuresOf' returns the list of features associated with a
 -- lexical item.
@@ -247,19 +246,20 @@ grammar =
 -- 'Lexical' chains consist only of lexical items, whereas 'Derived'
 -- chains are the result of a merge or move operation.
 data Type = Lexical | Derived
-          deriving( Eq, Ord, Show )
+          deriving( Eq, Ord )
+
+instance Show Type where
+  show Lexical = "∷"
+  show Derived = ":"
 
 -- | A 'Chain' is a contiguous forest (represented as a start and end
 -- pair in the chart), a type, and a set of features.
 data Chain = Chain( (ℕ, ℕ), Type, [Feature] )
            deriving( Eq )
 
--- instance Show Chain where
---   show (Chain( pos, t, fs) ) =
---     show pos ⧺ " " ⧺ showNoCoords (Chain (pos, t, fs))
-
-showFeatures ∷ [Feature] → String
-showFeatures fs = foldl (⧺) ε $ fmap show fs
+instance Show Chain where
+  show (Chain( pos, t, fs) ) =
+    show pos ⧺ show t ⧺ (foldl (⧺) ε $ show <$> fs)
 
 -- | An 'Expression' is a non-empty list of chains.  An invalid
 -- expression (formed by calling 'merge' or 'move' on arguments not
