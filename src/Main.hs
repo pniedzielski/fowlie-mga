@@ -145,7 +145,7 @@ tokenize = words ∘ fmap toLower  -- normalize to lowercase and then
 -- | A 'Selectional' feature is one that drives Merge.  A categorial
 -- feature 𝐹 and a selector feature =𝐹 can Merge to form a larger
 -- tree.
-type Selectional = String
+type Selectional = (String, ℕ, ℕ)
 
 -- | A 'Licensing' feature is one that drives Move.  A licensor
 -- feature +𝐹 and a licensee feature -𝐹 are checked by a Move to
@@ -161,10 +161,10 @@ data Feature = Category Selectional
              deriving( Eq )
 
 instance Show Feature where
-  show (Category f) =       f
-  show (Selector f) = "=" ⧺ f
-  show (Licensor f) = "+" ⧺ f
-  show (Licensee f) = "-" ⧺ f
+  show (Category (f, i, j)) = "[" ⧺ intercalate "," [f, show i, show j] ⧺ "]"
+  show (Selector (f, _, _)) = "=" ⧺ f
+  show (Licensor f)         = "+" ⧺ f
+  show (Licensee f)         = "-" ⧺ f
 
 
 --------------------------------------------------------------------------------
@@ -205,19 +205,19 @@ type Lexicon = [LexicalItem]
 -- | A 'Grammar' in MGA is a set of start symbols, a lexicon, and a
 -- mapping from categories to categories that represents what can
 -- adjoin to what.
-type Grammar = ([Selectional], Lexicon, ([(Selectional, [Selectional])]))
+type Grammar = ([String], Lexicon, ([(String, [String])]))
 
 -- | 'lexicon' returns a grammar's lexicon
 lexicon ∷ Grammar → Lexicon
 lexicon (_, l, _) = l
 
 -- | 'startSymbols' returns a grammar's set of start symbols.
-startSymbols ∷ Grammar → [Selectional]
+startSymbols ∷ Grammar → [String]
 startSymbols (s, _, _) = s
 
 -- | 'ad' returns the set of categories that are allowed to adjoin
 -- with a given category.
-ad ∷ Grammar → Selectional → [Selectional]
+ad ∷ Grammar → String → [String]
 ad (_, _, adMapping) cat = fromJust $ lookup cat adMapping
 
 -- | 'findInLexicon' returns a list of all lexical items with the
@@ -235,34 +235,47 @@ emptyItems = findInLexicon ε
 grammar ∷ Grammar
 grammar =
   (["T"],
-   [ LexicalItem( "marie",   [Category "D", Licensee "nom"]                )
-   , LexicalItem( "pierre",  [Category "D"]                                )
-   , LexicalItem( "praises", [Selector "D", Selector "D", Category "V"]    )
-   , LexicalItem( ε,         [Selector "V", Licensor "nom", Category "T"]  )
+   [ LexicalItem( "marie",   [cat "D", lce "nom"]          )
+   , LexicalItem( "pierre",  [cat "D"]                     )
+   , LexicalItem( "praises", [sel "D", sel "D",   cat "V"] )
+   , LexicalItem( ε,         [sel "V", lcr "nom", cat "T"] )
    ],
    []
   )
+  where cat c = Category (c, 0, 0)
+        sel c = Selector (c, 0, 0)
+        lcr f = Licensor f
+        lce f = Licensee f
 grammar' =
   (["T"],
-   [ LexicalItem( "john",  [Category "D",   Licensee "epp"]               )
-   , LexicalItem( "will",  [Selector "V",   Licensor "epp", Category "T"] )
-   , LexicalItem( "see",   [Selector "D",   Selector "D",   Category "V"] )
-   , LexicalItem( "the",   [Selector "Num", Category "D"]                 )
-   , LexicalItem( "movie", [Category "N"]                                 )
-   , LexicalItem( ε,       [Selector "T", Category "C"]                   )
-   , LexicalItem( ε,       [Selector "N", Category "Num"]                 )
+   [ LexicalItem( "john",  [cat "D",   lce "epp"]          )
+   , LexicalItem( "will",  [sel "V",   lcr "epp", cat "T"] )
+   , LexicalItem( "see",   [sel "D",   sel "D",   cat "V"] )
+   , LexicalItem( "the",   [sel "Num", cat "D"]            )
+   , LexicalItem( "movie", [cat "N"]                       )
+   , LexicalItem( ε,       [sel "T",   cat "C"]            )
+   , LexicalItem( ε,       [sel "N",   cat "Num"]          )
    ],
    []
   )
+  where cat c = Category (c, 0, 0)
+        sel c = Selector (c, 0, 0)
+        lcr f = Licensor f
+        lce f = Licensee f
 grammarWithAdjoin =
   (["D"],
-   [ LexicalItem( "the",  [Selector "N", Category "D"] )
-   , LexicalItem( "big",  [Category "A"]               )
-   , LexicalItem( "bad",  [Category "A"]               )
-   , LexicalItem( "wolf", [Category "N"]               )
+   [ LexicalItem( "the",  [sel "N", cat "D"] )
+   , LexicalItem( "big",  [cad "A" 5]        )
+   , LexicalItem( "bad",  [cad "A" 3]        )
+   , LexicalItem( "wolf", [cat "N"]          )
    ],
    [("N", ["A"])]
   )
+  where cat c   = Category (c, 0, 0)
+        cad c i = Category (c, i, 0)
+        sel c   = Selector (c, 0, 0)
+        lcr f   = Licensor f
+        lce f   = Licensee f
 
 
 --------------------------------------------------------------------------------
@@ -515,8 +528,8 @@ parseTokens g tokens =
     where isValidParse (Expression e) = isStartSymbol g e
 
 isStartSymbol ∷ Grammar → [Chain] → Bool
-isStartSymbol g [Chain (_, _, [Category f])] = f ∈ startSymbols g
-isStartSymbol _ _                            = False
+isStartSymbol g [Chain (_, _, [Category (f, _, _)])] = f ∈ startSymbols g
+isStartSymbol _ _                                    = False
 
 
 --------------------------------------------------------------------------------
