@@ -355,33 +355,33 @@ initialParseState g tokens = (agenda, c)
 
 -- | 'inferAll' reduces a ParseState until no more inferences can be
 -- made.
-inferAll ∷ ParseState → Chart
-inferAll initialState = c'
-  where parseStates   = iterate inferStep initialState
+inferAll ∷ Grammar → ParseState → Chart
+inferAll g initialState = c'
+  where parseStates   = iterate (inferStep g) initialState
         Just ([], c') = find (null ∘ fst) parseStates
 
 -- | 'inferStep' reduces a ParseState by pulling one item of the
 -- agenda and applying all inferences it can using that item.
-inferStep ∷ ParseState → ParseState
-inferStep ([], c)            = ([], c)
-inferStep (item : agenda, c) = (agenda', c')
+inferStep ∷ Grammar → ParseState → ParseState
+inferStep _ ([], c)            = ([], c)
+inferStep g (item : agenda, c) = (agenda', c')
   where
     Just (_, agenda', c') = find (\(x, _, _) → x ≡ Nothing) inferences
     inferences            = iterate inferOn initialInference
     initialInference      = (Just item, agenda, c)
     inferOn (Nothing, agenda, c)   = (Nothing, agenda, c)
-    inferOn (Just item, agenda, c) = (infer item c, agenda', c')
+    inferOn (Just item, agenda, c) = (infer g item c, agenda', c')
       where
-        canInfer  = isJust   $ infer item c
-        inference = fromJust $ infer item c
+        canInfer  = isJust   $ infer g item c
+        inference = fromJust $ infer g item c
         agenda'   = if canInfer then inference : agenda else agenda
         c'        = if canInfer then inference : c      else c
 
 -- | 'inferOne' returns a list of conclusions we can draw by applying
 -- inference rules on a given expression with a current state of
 -- knowledge.  This list may contain known conclusions.
-inferOne ∷ Expression → Chart → [Expression]
-inferOne item c = conclusions
+inferOne ∷ Grammar → Expression → Chart → [Expression]
+inferOne g item c = conclusions
   where
     -- Try inference rules:
     -- Move operates only on one expression
@@ -390,17 +390,23 @@ inferOne item c = conclusions
     merge1Conclusions  = merge1 item <$> c
     merge2Conclusions  = merge2 item <$> c
     merge3Conclusions  = merge3 item <$> c
-    conclusions        = catMaybes (moveConclusions   ⧺
-                                    merge1Conclusions ⧺
-                                    merge2Conclusions ⧺
+    -- Adjunctions operate on two expressions
+    adjoin1Conclusions = adjoin1 g item <$> c
+    adjoin2Conclusions = adjoin2 g item <$> c
+    -- Finally, remove all Nothings
+    conclusions        = catMaybes (moveConclusions    ⧺
+                                    adjoin1Conclusions ⧺
+                                    adjoin2Conclusions ⧺
+                                    merge1Conclusions  ⧺
+                                    merge2Conclusions  ⧺
                                     merge3Conclusions)
 
 -- | 'infer' returns either an unknown conclusion drawn from the given
 -- expression and the current state of knowledge, or 'Nothing'.
-infer ∷ Expression → Chart → Maybe Expression
-infer item c = conclusion
+infer ∷ Grammar → Expression → Chart → Maybe Expression
+infer g item c = conclusion
   where
-    conclusion = listToMaybe $ filter (not ∘ (∈ c)) $ inferOne item c
+    conclusion = listToMaybe $ filter (not ∘ (∈ c)) $ inferOne g item c
 
 {-
 
@@ -449,7 +455,7 @@ merge3 ∷ Expression → Expression → Maybe Expression
 merge3 (Expression( Chain( pos ,           _,   Category (f,_,_)  : γ : γs ) : βs ))
        (Expression( Chain( pos',           _,   Selector (f',_,_) : δ : δs ) : αs ))
   | f ≡ f'    = Just (Expression newExpr)
-  | otherwise = Nothing 
+  | otherwise = Nothing
   where newChain  = Chain( pos , Derived , γ : γs )
         newChain' = Chain( pos', Derived, δ : δs )
         newExpr   = [newChain'] ⧺ αs ⧺ [newChain] ⧺ βs
@@ -461,6 +467,54 @@ merge3 (Expression( Chain( pos',           _,   Selector (f',_,_) : δ : δs ) :
         newChain' = Chain( pos', Derived, δ : δs )
         newExpr   = [newChain'] ⧺ αs ⧺ [newChain] ⧺ βs
 merge3 _ _ = Nothing
+
+{-
+
+   ADJOIN
+
+-}
+
+-- adjoin myself as an adjunct to something else
+adjoin1 ∷ Grammar → Expression → Expression → Maybe Expression
+adjoin1 g
+        (Expression( Chain( (s,  m), _, Category (f,i,_)    : [] ) : [] ))
+        (Expression( Chain( (m', e), _, Category (f',i',j') : γ  ) : αs ))
+  | m ≡ m' ∧ canAdjoin ∧ i ≥ j' = Just (Expression newExpr)
+  | otherwise                   = Nothing
+  where canAdjoin = f ∈ ad g f'
+        newChain  = Chain( (s, e), Derived, Category (f',i',i) : γ )
+        newExpr   = [newChain] ⧺ αs
+adjoin1 g
+        (Expression( Chain( (m', e), _, Category (f',i',j') : γ  ) : αs ))
+        (Expression( Chain( (s,  m), _, Category (f,i,_)    : [] ) : [] ))
+  | m ≡ m' ∧ canAdjoin ∧ i ≥ j' = Just (Expression newExpr)
+  | otherwise                   = Nothing
+  where canAdjoin = f ∈ ad g f'
+        newChain  = Chain( (s, e), Derived, Category (f',i',i) : γ )
+        newExpr   = [newChain] ⧺ αs
+adjoin1 _ _ _ = Nothing
+
+-- adjoin two non-contiguous things with further requirements
+adjoin2 ∷ Grammar → Expression → Expression → Maybe Expression
+adjoin2 g
+        (Expression( Chain( pos , _, Category (f,i,_)    : γ : γs ) : [] ))
+        (Expression( Chain( pos', _, Category (f',i',j') : δ : δs ) : αs ))
+  | canAdjoin ∧ i ≥ j' = Just (Expression newExpr)
+  | otherwise          = Nothing
+  where canAdjoin = f ∈ ad g f'
+        newChain  = Chain( pos , Derived,                       γ : γs )
+        newChain' = Chain( pos', Derived, Category (f',i',j') : δ : δs )
+        newExpr   = [newChain'] ⧺ [newChain] ⧺ αs
+adjoin2 g
+        (Expression( Chain( pos', _, Category (f',i',j') : δ : δs ) : αs ))
+        (Expression( Chain( pos , _, Category (f,i,_)    : γ : γs ) : [] ))
+  | canAdjoin ∧ i ≥ j' = Just (Expression newExpr)
+  | otherwise          = Nothing
+  where canAdjoin = f ∈ ad g f'
+        newChain  = Chain( pos , Derived,                       γ : γs )
+        newChain' = Chain( pos', Derived, Category (f',i',j') : δ : δs )
+        newExpr   = [newChain'] ⧺ [newChain] ⧺ αs
+adjoin2 _ _ _ = Nothing
 
 {-
 
@@ -506,7 +560,7 @@ move _ = Nothing
 -}
 
 fullChart ∷ Grammar -> [Token] → Chart
-fullChart g tokens = inferAll initialState
+fullChart g tokens = inferAll g initialState
   where initialState = initialParseState g tokens
 
 partialParseTokens ∷ Grammar → [Token] → Maybe [Expression]
