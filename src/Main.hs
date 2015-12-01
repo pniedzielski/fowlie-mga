@@ -414,14 +414,14 @@ infer item c = conclusion
 
 -- merge lexical entry with something else
 merge1 ∷ Expression → Expression → Maybe Expression
-merge1 (Expression( Chain( (s,  m), Lexical, Selector f  : γ  ) : [] ))
-       (Expression( Chain( (m', e),       _, Category f' : [] ) : αs ))
+merge1 (Expression( Chain( (s,  m), Lexical, Selector (f,_,_)  : γ  ) : [] ))
+       (Expression( Chain( (m', e),       _, Category (f',_,_) : [] ) : αs ))
   | m ≡ m' ∧ f ≡ f'   = Just (Expression newExpr)
   | otherwise         = Nothing
   where newChain = Chain( (s, e), Derived, γ )
         newExpr  = [newChain] ⧺ αs
-merge1 (Expression( Chain( (m', e),       _, Category f' : [] ) : αs ))
-       (Expression( Chain( (s,  m), Lexical, Selector f  : γ  ) : [] ))
+merge1 (Expression( Chain( (m', e),       _, Category (f',_,_) : [] ) : αs ))
+       (Expression( Chain( (s,  m), Lexical, Selector (f,_,_)  : γ  ) : [] ))
   | m ≡ m' ∧ f ≡ f'   = Just (Expression newExpr)
   | otherwise         = Nothing
   where newChain = Chain( (s, e), Derived, γ )
@@ -430,14 +430,14 @@ merge1 _ _            = Nothing
 
 -- merge something with derived entry
 merge2 ∷ Expression → Expression → Maybe Expression
-merge2 (Expression( Chain( (s,  m),       _, Category f  : [] ) : βs ))
-       (Expression( Chain( (m', e), Derived, Selector f' : γ  ) : αs ))
+merge2 (Expression( Chain( (s,  m),       _, Category (f,_,_)  : [] ) : βs ))
+       (Expression( Chain( (m', e), Derived, Selector (f',_,_) : γ  ) : αs ))
   | m ≡ m' ∧ f ≡ f'   = Just (Expression newExpr)
   | otherwise         = Nothing
   where newChain = Chain( (s, e), Derived, γ )
         newExpr  = [newChain] ⧺ αs ⧺ βs
-merge2 (Expression( Chain( (m', e), Derived, Selector f' : γ  ) : αs ))
-       (Expression( Chain( (s,  m),       _, Category f  : [] ) : βs ))
+merge2 (Expression( Chain( (m', e), Derived, Selector (f',_,_) : γ  ) : αs ))
+       (Expression( Chain( (s,  m),       _, Category (f,_,_)  : [] ) : βs ))
   | m ≡ m' ∧ f ≡ f'   = Just (Expression newExpr)
   | otherwise         = Nothing
   where newChain = Chain( (s, e), Derived, γ )
@@ -446,15 +446,15 @@ merge2 _ _ = Nothing
 
 -- merge two non-contiguous things with further requirements
 merge3 ∷ Expression → Expression → Maybe Expression
-merge3 (Expression( Chain( pos ,           _,   Category f  : γ : γs ) : βs ))
-       (Expression( Chain( pos',           _,   Selector f' : δ : δs ) : αs ))
+merge3 (Expression( Chain( pos ,           _,   Category (f,_,_)  : γ : γs ) : βs ))
+       (Expression( Chain( pos',           _,   Selector (f',_,_) : δ : δs ) : αs ))
   | f ≡ f'    = Just (Expression newExpr)
   | otherwise = Nothing 
   where newChain  = Chain( pos , Derived , γ : γs )
         newChain' = Chain( pos', Derived, δ : δs )
         newExpr   = [newChain'] ⧺ αs ⧺ [newChain] ⧺ βs
-merge3 (Expression( Chain( pos',           _,   Selector f' : δ : δs ) : αs ))
-       (Expression( Chain( pos ,           _,   Category f  : γ : γs ) : βs ))
+merge3 (Expression( Chain( pos',           _,   Selector (f',_,_) : δ : δs ) : αs ))
+       (Expression( Chain( pos ,           _,   Category (f,_,_)  : γ : γs ) : βs ))
   | f ≡ f'    = Just (Expression newExpr)
   | otherwise = Nothing
   where newChain  = Chain( pos , Derived , γ : γs )
