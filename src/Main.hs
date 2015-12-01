@@ -23,9 +23,9 @@ module Main( main ) where
 
 import System.Environment
 import Data.Maybe
-import Data.Matrix
 import Data.Char
 import Data.List
+import Data.List.Unicode
 import Prelude.Unicode
 import Control.Applicative
 import Control.Monad.Unicode
@@ -64,7 +64,7 @@ This program is divided into the following sections:
 -- prints the results to standard out.  If there are no command line
 -- arguments, then each line of standard in is used instead.
 main ∷ IO ()
-main = getInputs ≫= putStr ∘ unlines ∘ fmap (show ∘ parse)
+main = getInputs ≫= putStr ∘ unlines ∘ fmap (show ∘ parse grammar')
   where
     -- Return command line arguments if there are any, and stdin lines
     -- otherwise.
@@ -227,14 +227,21 @@ emptyItems = findInLexicon ε
 -- | 'grammar' is a test grammar.
 grammar ∷ Grammar
 grammar =
-  (["C"],
-   [ LexicalItem( "fox",     [Category "N"]                                )
-   , LexicalItem( "the",     [Selector "N", Category "D"]                  )
-   , LexicalItem( "marie",   [Category "D", Licensee "case"]               )
+  (["T"],
+   [ LexicalItem( "marie",   [Category "D", Licensee "nom"]                )
    , LexicalItem( "pierre",  [Category "D"]                                )
    , LexicalItem( "praises", [Selector "D", Selector "D", Category "V"]    )
-   , LexicalItem( ε,         [Selector "V", Licensor "case", Category "T"] )
-   , LexicalItem( ε,         [Selector "T", Category "C"]                  )
+   , LexicalItem( ε,         [Selector "V", Licensor "nom", Category "T"]  )
+   ])
+grammar' =
+  (["T"],
+   [ LexicalItem( "john",  [Category "D",   Licensee "epp"]               )
+   , LexicalItem( "will",  [Selector "V",   Licensor "epp", Category "T"] )
+   , LexicalItem( "see",   [Selector "D",   Selector "D",   Category "V"] )
+   , LexicalItem( "the",   [Selector "Num", Category "D"]                 )
+   , LexicalItem( "movie", [Category "N"]                                 )
+   , LexicalItem( ε,       [Selector "T", Category "C"]                   )
+   , LexicalItem( ε,       [Selector "N", Category "Num"]                 )
    ])
 
 
@@ -264,24 +271,103 @@ instance Show Chain where
 -- | An 'Expression' is a non-empty list of chains.  An invalid
 -- expression (formed by calling 'merge' or 'move' on arguments not
 -- within its definition space) is represented by an empty list.
-type Expression = [Chain]
-
--- | A 'ChartEntry' is an 'Expression' that pretty-prints.
-data ChartEntry = ChartEntry Expression
+data Expression = Expression [Chain]
                 deriving( Eq )
 
-instance Show ChartEntry where
-  show (ChartEntry( [] ))     = ""
-  show (ChartEntry( x : xs )) = showFirst x ⧺ showRest xs
-    where
-      -- Print out the first chain in an expression.
-      showFirst (Chain( _, _, fs ))   =             showFeatures fs
-      -- Print out the remaining chains in an expression.
-      showRest  []  = ε
-      showRest  xs' = ";" ⧺ (intercalate ";" $ fmap showRest' xs')
-      -- Print out a single chain in the tail of an expression
-      showRest' (Chain( pos, _, [] )) = ε
-      showRest' (Chain( pos, _, fs )) = show pos ⧺ showFeatures fs
+instance Show Expression where
+  show (Expression chains) = "  " ++ (intercalate ";" $ show <$> chains)
+
+
+-- | Give a lexical item and a span, 'lexicalToExpr' yields a
+-- lexical expression with the same features.
+lexicalToExpr ∷ (ℕ, ℕ) → LexicalItem → Expression
+lexicalToExpr pos l = Expression [chain]
+  where chain = Chain( pos, Lexical, features )
+        LexicalItem( _, features ) = l
+
+{-
+
+  CHART PARSING
+
+-}
+
+-- | The 'Agenda' holds all items we want to use in an inference.
+type Agenda = [Expression]
+
+-- | The 'Chart' holds all conclusions we know to be true at a given
+-- parse state, based on the inference rules of the grammar.
+type Chart = [Expression]
+
+-- | 'ParseState' is the combination of the Agenda and the Chart.
+type ParseState = (Agenda, Chart)
+
+-- | The 'initialParseState' contains all axioms we can derive from
+-- the grammar and the string of tokens.
+initialParseState ∷ Grammar → [Token] → ParseState
+initialParseState g tokens = (agenda, c)
+  where
+    -- Initially, the agenda and the chart are the same.
+    agenda            = concat emptyAxioms ⧺ concat lexicalAxioms
+    c                 = concat emptyAxioms ⧺ concat lexicalAxioms
+    -- To compute this, we find all lexical items and null entries in
+    -- the string.
+    inputSize         = length tokens
+    -- emptyAxioms is all ε lexical items
+    emptyAxioms       = emptyAxiomsAt             <$> [0..inputSize]
+    emptyAxiomsAt n   = lexicalToExpr (n, n)      <$> emptyItems g
+    -- lexicalAxioms is all lexical items in the input
+    lexicalAxioms     = lexicalAxiomsAt           <$> [0..inputSize-1]
+    lexicalAxiomsAt n = lexicalToExpr (n, succ n) <$> lexicals n
+    lexicals n        = findInLexicon (tokens !! n) g
+
+-- | 'inferAll' reduces a ParseState until no more inferences can be
+-- made.
+inferAll ∷ ParseState → Chart
+inferAll initialState = c'
+  where parseStates   = iterate inferStep initialState
+        Just ([], c') = find (null ∘ fst) parseStates
+
+-- | 'inferStep' reduces a ParseState by pulling one item of the
+-- agenda and applying all inferences it can using that item.
+inferStep ∷ ParseState → ParseState
+inferStep ([], c)            = ([], c)
+inferStep (item : agenda, c) = (agenda', c')
+  where
+    Just (_, agenda', c') = find (\(x, _, _) → x ≡ Nothing) inferences
+    inferences            = iterate inferOn initialInference
+    initialInference      = (Just item, agenda, c)
+    inferOn (Nothing, agenda, c)   = (Nothing, agenda, c)
+    inferOn (Just item, agenda, c) = (infer item c, agenda', c')
+      where
+        canInfer  = isJust   $ infer item c
+        inference = fromJust $ infer item c
+        agenda'   = if canInfer then inference : agenda else agenda
+        c'        = if canInfer then inference : c      else c
+
+-- | 'inferOne' returns a list of conclusions we can draw by applying
+-- inference rules on a given expression with a current state of
+-- knowledge.  This list may contain known conclusions.
+inferOne ∷ Expression → Chart → [Expression]
+inferOne item c = conclusions
+  where
+    -- Try inference rules:
+    -- Move operates only on one expression
+    moveConclusions    = [move item]
+    -- Merges operate on two expressions
+    merge1Conclusions  = merge1 item <$> c
+    merge2Conclusions  = merge2 item <$> c
+    merge3Conclusions  = merge3 item <$> c
+    conclusions        = catMaybes (moveConclusions   ⧺
+                                    merge1Conclusions ⧺
+                                    merge2Conclusions ⧺
+                                    merge3Conclusions)
+
+-- | 'infer' returns either an unknown conclusion drawn from the given
+-- expression and the current state of knowledge, or 'Nothing'.
+infer ∷ Expression → Chart → Maybe Expression
+infer item c = conclusion
+  where
+    conclusion = listToMaybe $ filter (not ∘ (∈ c)) $ inferOne item c
 
 {-
 
@@ -289,106 +375,128 @@ instance Show ChartEntry where
 
 -}
 
--- | 'merge' Takes a left-hand chart entry and a right-hand chart
+-- | 'merge' takes a left-hand chart entry and a right-hand chart
 -- entry and attempts to merge them according to the three MG merge
 -- functions.  If the merge fails, we return an empty list.
-merge ∷ Expression → Expression → Expression
 
--- merge1: merge lexical entry with something else
-merge ( Chain( (s, _),   Lexical,   Selector f  : γ  ) : [] )
-      ( Chain( (_, e),         _,   Category f' : [] ) : αs )
-  | f ≡ f'   = newExpr
-  | otherwise = []
+-- merge lexical entry with something else
+merge1 ∷ Expression → Expression → Maybe Expression
+merge1 (Expression( Chain( (s,  m), Lexical, Selector f  : γ  ) : [] ))
+       (Expression( Chain( (m', e),       _, Category f' : [] ) : αs ))
+  | m ≡ m' ∧ f ≡ f'   = Just (Expression newExpr)
+  | otherwise         = Nothing
   where newChain = Chain( (s, e), Derived, γ )
         newExpr  = [newChain] ⧺ αs
-
--- merge2: merge something with derived entry
-merge ( Chain( (s, _),         _,   Category f  : [] ) : βs )
-      ( Chain( (_, e),   Derived,   Selector f' : γ  ) : αs )
-  | f ≡ f'   = newExpr
-  | otherwise = []
+merge1 (Expression( Chain( (m', e),       _, Category f' : [] ) : αs ))
+       (Expression( Chain( (s,  m), Lexical, Selector f  : γ  ) : [] ))
+  | m ≡ m' ∧ f ≡ f'   = Just (Expression newExpr)
+  | otherwise         = Nothing
   where newChain = Chain( (s, e), Derived, γ )
-        newExpr = [newChain] ⧺ αs ⧺ βs
+        newExpr  = [newChain] ⧺ αs
+merge1 _ _            = Nothing
 
--- merge3: merge two things with further requirements
-merge ( Chain( pos ,          t ,   Category f  : γ : γs ) : βs )
-      ( Chain( pos',          t',   Selector f' : δ : δs ) : αs )
-  | f ≡ f'    = newExpr
-  | otherwise = []
-  where newChain  = Chain( pos , t , γ : γs )
-        newChain' = Chain( pos', t', δ : δs )
+-- merge something with derived entry
+merge2 ∷ Expression → Expression → Maybe Expression
+merge2 (Expression( Chain( (s,  m),       _, Category f  : [] ) : βs ))
+       (Expression( Chain( (m', e), Derived, Selector f' : γ  ) : αs ))
+  | m ≡ m' ∧ f ≡ f'   = Just (Expression newExpr)
+  | otherwise         = Nothing
+  where newChain = Chain( (s, e), Derived, γ )
+        newExpr  = [newChain] ⧺ αs ⧺ βs
+merge2 (Expression( Chain( (m', e), Derived, Selector f' : γ  ) : αs ))
+       (Expression( Chain( (s,  m),       _, Category f  : [] ) : βs ))
+  | m ≡ m' ∧ f ≡ f'   = Just (Expression newExpr)
+  | otherwise         = Nothing
+  where newChain = Chain( (s, e), Derived, γ )
+        newExpr  = [newChain] ⧺ αs ⧺ βs
+merge2 _ _ = Nothing
+
+-- merge two non-contiguous things with further requirements
+merge3 ∷ Expression → Expression → Maybe Expression
+merge3 (Expression( Chain( pos ,           _,   Category f  : γ : γs ) : βs ))
+       (Expression( Chain( pos',           _,   Selector f' : δ : δs ) : αs ))
+  | f ≡ f'    = Just (Expression newExpr)
+  | otherwise = Nothing 
+  where newChain  = Chain( pos , Derived , γ : γs )
+        newChain' = Chain( pos', Derived, δ : δs )
         newExpr   = [newChain'] ⧺ αs ⧺ [newChain] ⧺ βs
-merge ( Chain( pos',          t',   Selector f' : δ : δs ) : αs )
-      ( Chain( pos ,          t ,   Category f  : γ : γs ) : βs )
-  | f ≡ f'    = newExpr
-  | otherwise = []
-  where newChain  = Chain( pos , t , γ : γs )
-        newChain' = Chain( pos', t', δ : δs )
+merge3 (Expression( Chain( pos',           _,   Selector f' : δ : δs ) : αs ))
+       (Expression( Chain( pos ,           _,   Category f  : γ : γs ) : βs ))
+  | f ≡ f'    = Just (Expression newExpr)
+  | otherwise = Nothing
+  where newChain  = Chain( pos , Derived , γ : γs )
+        newChain' = Chain( pos', Derived, δ : δs )
         newExpr   = [newChain'] ⧺ αs ⧺ [newChain] ⧺ βs
+merge3 _ _ = Nothing
 
--- otherwise, don't merge
-merge _ _ = []
+{-
 
-partialParseTokens ∷ [Token] → Maybe [ChartEntry]
-partialParseTokens input =
-  nullToNothing $ ChartEntry <$> parseResults
-    where parseResults = cky g input start end
-          start        = 0
-          end          = length input
-          g            = grammar
+   MOVE
 
-parseTokens ∷ [Token] → Maybe [ChartEntry]
-parseTokens input =
-     partialParseTokens input
-  ≫= nullToNothing ∘ filter (\(ChartEntry x) → isValidParse x)
-    where isValidParse = isStartSymbol g
-          g            = grammar
+-}
 
-isStartSymbol ∷ Grammar → Expression → Bool
+-- | 'move' takes an expression and attempts to check licensing
+-- features in each chain.
+move ∷ Expression → Maybe Expression
+-- We need at least two chains to move.
+move (Expression( c : [] )) = Nothing
+-- move1:
+move (Expression( c@(Chain( (m, e), Derived, Licensor f : γ ) : chains) ))
+  | any onlyLicensedBy chains = Just( Expression( [newChain] ⧺ αs ) )
+  | otherwise                 = Nothing
+  where
+    onlyLicensedBy (Chain( (s, m'), Derived, Licensee f' : [] ))
+                          = m ≡ m' ∧ f ≡ f'
+    onlyLicensedBy _      = False
+    mover                 = fromJust $ find onlyLicensedBy chains
+    Chain( (s, _), _, _ ) = mover
+    newChain              = Chain( (s, e), Derived, γ )
+    αs                    = delete mover chains
+-- move2:
+move (Expression( c@(Chain( pos, t, Licensor f : γ ) : chains) ))
+  | any licensedBy chains =
+      Just( Expression( Chain( pos, t, γ ) : featureCheck chains ) )
+  | otherwise             = Nothing
+  where
+    featureCheck = modifyFirst licensedBy checkFeature
+    licensedBy   (Chain(    _,  _, Licensee f' : _ )) = f ≡ f'
+    licensedBy   _                                    = False
+    checkFeature (Chain( pos', t', Licensee f' : δ )) =
+      Chain( pos', t', δ )
+-- otherwise, don't move
+move _ = Nothing
+
+{-
+
+   PARSING
+
+-}
+
+fullChart ∷ Grammar -> [Token] → Chart
+fullChart g tokens = inferAll initialState
+  where initialState = initialParseState g tokens
+
+partialParseTokens ∷ Grammar → [Token] → Maybe [Expression]
+partialParseTokens g tokens =
+  nullToNothing results
+  where
+    chart      = fullChart g tokens
+    endState (Expression[ Chain( (start', end'), _, [Category _] ) ])
+               = start' ≡ start ∧ end' ≡ end
+    endState _ = False
+    results    = filter endState chart
+    start      = 0
+    end        = length tokens
+
+parseTokens ∷ Grammar → [Token] → Maybe [Expression]
+parseTokens g tokens =
+     partialParseTokens g tokens
+  ≫= nullToNothing ∘ filter isValidParse
+    where isValidParse (Expression e) = isStartSymbol g e
+
+isStartSymbol ∷ Grammar → [Chain] → Bool
 isStartSymbol g [Chain (_, _, [Category f])] = f ∈ startSymbols g
 isStartSymbol _ _                            = False
-
-cky ∷ Grammar → [Token] → ℕ → ℕ → [Expression]
-cky g input start end
-  | invalidCell     = []
-  | emptyCatCell    = emptyItemEntries
-  | lexicalCell     = lexicalItemEntries
-  | otherwise       = stablize (nub ∘ mergeWithEmpties) constituents
-  where
-    -- What type of cell is (start, end)?
-    invalidCell  = end < start      -- Unused cell
-    emptyCatCell = start ≡ end      -- ε entries
-    lexicalCell  = end - start ≡ 1  -- Lexical entries
-    -- Convert lexical items to chart entries
-    lexicalToChart l    = [Chain ((start, end), Lexical, featuresOf l)]
-    -- All empty items.
-    emptyItemEntries   = lexicalToChart <$> emptyItems g
-    -- All lexical items that are homophonous with token.  This allows
-    -- us to capture lexical ambiguity.
-    lexicalItemEntries = fmap lexicalToChart lexicalItems
-    lexicalItems       = findInLexicon token g
-    token              = input !! start
-    -- Finds all possible constituents.
-    constituents       =
-      do
-        midpoint ← [(start + 1) .. (end - 1)]
-        lhs      ← cky g input start midpoint
-        rhs      ← cky g input midpoint end
-        return $ merge lhs rhs
-    mergeWithEmpties items =
-      items ⧺ do
-        lhs      ← cky g input start start
-        rhs      ← items
-        return $ merge lhs rhs
-
-fullChart ∷ Grammar -> [Token] → Matrix [ChartEntry]
-fullChart g input = fmap (fmap ChartEntry) $ fromLists $ do
-  x ← [0..end]
-  return $
-    do
-      y ← [0..end]
-      return $ filter (not ∘ null) $ cky g input x y
-        where end = length input
 
 
 --------------------------------------------------------------------------------
@@ -396,10 +504,10 @@ fullChart g input = fmap (fmap ChartEntry) $ fromLists $ do
 --------------------------------------------------------------------------------
 
 
--- | 'recognize' takes a list of tokens and returns whether the list
+-- | 'recognizeTokens' takes a list of tokens and returns whether the list
 -- of tokens can be generated by the language.
-recognizeTokens ∷ [Token] → Bool
-recognizeTokens = isJust ∘ parseTokens
+recognizeTokens ∷ Grammar → [Token] → Bool
+recognizeTokens g = isJust ∘ parseTokens g
 
 
 --------------------------------------------------------------------------------
@@ -407,6 +515,6 @@ recognizeTokens = isJust ∘ parseTokens
 --------------------------------------------------------------------------------
 
 
-parse        = parseTokens        ∘ tokenize
-partialParse = partialParseTokens ∘ tokenize
-recognize    = recognizeTokens    ∘ tokenize
+parse        g = parseTokens        g ∘ tokenize
+partialParse g = partialParseTokens g ∘ tokenize
+recognize    g = recognizeTokens    g ∘ tokenize
