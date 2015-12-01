@@ -218,7 +218,7 @@ startSymbols (s, _, _) = s
 -- | 'ad' returns the set of categories that are allowed to adjoin
 -- with a given category.
 ad ∷ Grammar → String → [String]
-ad (_, _, adMapping) cat = fromJust $ lookup cat adMapping
+ad (_, _, adMapping) cat = fromMaybe [] $ lookup cat adMapping
 
 -- | 'findInLexicon' returns a list of all lexical items with the
 -- given surface form.  Because we allow homophony in our lexicon,
