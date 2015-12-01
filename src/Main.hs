@@ -254,6 +254,15 @@ grammar' =
    ],
    []
   )
+grammarWithAdjoin =
+  (["D"],
+   [ LexicalItem( "the",  [Selector "N", Category "D"] )
+   , LexicalItem( "big",  [Category "A"]               )
+   , LexicalItem( "bad",  [Category "A"]               )
+   , LexicalItem( "wolf", [Category "N"]               )
+   ],
+   [("N", ["A"])]
+  )
 
 
 --------------------------------------------------------------------------------
