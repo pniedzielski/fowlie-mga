@@ -202,16 +202,23 @@ type Lexicon = [LexicalItem]
 --------------------------------------------------------------------------------
 
 
--- | A 'Grammar' is just a lexicon and a set of start symbols in MG.
-type Grammar = ([Selectional], Lexicon)
+-- | A 'Grammar' in MGA is a set of start symbols, a lexicon, and a
+-- mapping from categories to categories that represents what can
+-- adjoin to what.
+type Grammar = ([Selectional], Lexicon, ([(Selectional, [Selectional])]))
 
 -- | 'lexicon' returns a grammar's lexicon
 lexicon ∷ Grammar → Lexicon
-lexicon (_, l) = l
+lexicon (_, l, _) = l
 
 -- | 'startSymbols' returns a grammar's set of start symbols.
 startSymbols ∷ Grammar → [Selectional]
-startSymbols (s, _) = s
+startSymbols (s, _, _) = s
+
+-- | 'ad' returns the set of categories that are allowed to adjoin
+-- with a given category.
+ad ∷ Grammar → Selectional → [Selectional]
+ad (_, _, adMapping) cat = fromJust $ lookup cat adMapping
 
 -- | 'findInLexicon' returns a list of all lexical items with the
 -- given surface form.  Because we allow homophony in our lexicon,
@@ -232,7 +239,9 @@ grammar =
    , LexicalItem( "pierre",  [Category "D"]                                )
    , LexicalItem( "praises", [Selector "D", Selector "D", Category "V"]    )
    , LexicalItem( ε,         [Selector "V", Licensor "nom", Category "T"]  )
-   ])
+   ],
+   []
+  )
 grammar' =
   (["T"],
    [ LexicalItem( "john",  [Category "D",   Licensee "epp"]               )
@@ -242,7 +251,9 @@ grammar' =
    , LexicalItem( "movie", [Category "N"]                                 )
    , LexicalItem( ε,       [Selector "T", Category "C"]                   )
    , LexicalItem( ε,       [Selector "N", Category "Num"]                 )
-   ])
+   ],
+   []
+  )
 
 
 --------------------------------------------------------------------------------
