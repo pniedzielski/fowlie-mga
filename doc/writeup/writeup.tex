@@ -8,7 +8,7 @@
 \usepackage{semantic}
 \usepackage{tikz-qtree}
 \usepackage{titling}
-\setlength{\droptitle}{-7em}
+\setlength{\droptitle}{-9em}
 \usepackage{gb4e}
 \noautomath
 
@@ -585,6 +585,9 @@ Within an MGA, we could make a lexical item $\epsilon$ : \texttt{=N
 follow this series of steps:
 
 \begin{enumerate}
+\setlength{\itemsep}{0pt}
+\setlength{\parskip}{0pt}
+\setlength{\parsep}{0pt}
 \item \textbf{Adjoin} adjacent \textit{green} and \textit{hat} to form
   \texttt{N} at level \texttt{1}.
 \item \textbf{Adjoin} nonadjacent \textit{ugly} and \textit{green hat}
@@ -599,7 +602,6 @@ follow this series of steps:
   cancel \texttt{+Afoc} and \texttt{-Afoc} to form \texttt{Foc}.
 \item \textbf{Merge} adjacent \textit{the} and \textit{ugly $\epsilon$
     enormous green hat} to form \texttt{D}.
-\item \dots
 \end{enumerate}
 
 The presence of this $\varnothing_{foc}$ captures the marked nature of
@@ -747,9 +749,12 @@ to infer on is removed from the agenda, and the next item is tried.
 This ensures that the inference engine always either makes forward
 progress or terminates.
 
-The functions that model the inference rules were direct
-representations of the inference rules shown in Figures
-\ref{fig:mg-cky-inference} and \ref{fig:mga-cky-inference}.
+The parser includes three simple grammars that can be used as input to
+the \texttt{recognize} function: \texttt{grammar} from
+\cite{fowlie2015} can parse and case assign ``Marie praises Pierre'',
+\texttt{grammar'} from \cite{sportiche2013} can parse and case assign
+``John will see the movie'', and \texttt{grammarWithAdjoin} from
+\cite{fowlie2015} can parse ``the big bad wolf''.
 
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
