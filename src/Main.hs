@@ -64,7 +64,7 @@ This program is divided into the following sections:
 -- prints the results to standard out.  If there are no command line
 -- arguments, then each line of standard in is used instead.
 main ∷ IO ()
-main = getInputs ≫= putStr ∘ unlines ∘ fmap (show ∘ parse grammar')
+main = getInputs ≫= putStr ∘ unlines ∘ fmap (show ∘ recognize grammar')
   where
     -- Return command line arguments if there are any, and stdin lines
     -- otherwise.
@@ -205,7 +205,7 @@ type Lexicon = [LexicalItem]
 -- | A 'Grammar' in MGA is a set of start symbols, a lexicon, and a
 -- mapping from categories to categories that represents what can
 -- adjoin to what.
-type Grammar = ([String], Lexicon, ([(String, [String])]))
+type Grammar = ([String], Lexicon, [(String, [String])])
 
 -- | 'lexicon' returns a grammar's lexicon
 lexicon ∷ Grammar → Lexicon
@@ -299,7 +299,7 @@ data Chain = Chain( (ℕ, ℕ), Type, [Feature] )
 
 instance Show Chain where
   show (Chain( pos, t, fs) ) =
-    show pos ⧺ show t ⧺ (foldl (⧺) ε $ show <$> fs)
+    show pos ⧺ show t ⧺ foldl (⧺) ε (show <$> fs)
 
 -- | An 'Expression' is a non-empty list of chains.  An invalid
 -- expression (formed by calling 'merge' or 'move' on arguments not
@@ -308,7 +308,7 @@ data Expression = Expression [Chain]
                 deriving( Eq )
 
 instance Show Expression where
-  show (Expression chains) = "  " ++ (intercalate ";" $ show <$> chains)
+  show (Expression chains) = "  " ++ intercalate ";" (show <$> chains)
 
 
 -- | Give a lexical item and a span, 'lexicalToExpr' yields a
@@ -422,50 +422,62 @@ infer g item c = conclusion
 merge1 ∷ Expression → Expression → Maybe Expression
 merge1 (Expression( Chain( (s,  m), Lexical, Selector (f,_,_)  : γ  ) : [] ))
        (Expression( Chain( (m', e),       _, Category (f',_,_) : [] ) : αs ))
+
   | m ≡ m' ∧ f ≡ f'   = Just (Expression newExpr)
   | otherwise         = Nothing
   where newChain = Chain( (s, e), Derived, γ )
         newExpr  = [newChain] ⧺ αs
+
 merge1 (Expression( Chain( (m', e),       _, Category (f',_,_) : [] ) : αs ))
        (Expression( Chain( (s,  m), Lexical, Selector (f,_,_)  : γ  ) : [] ))
+
   | m ≡ m' ∧ f ≡ f'   = Just (Expression newExpr)
   | otherwise         = Nothing
   where newChain = Chain( (s, e), Derived, γ )
         newExpr  = [newChain] ⧺ αs
+
 merge1 _ _            = Nothing
 
 -- merge something with derived entry
 merge2 ∷ Expression → Expression → Maybe Expression
 merge2 (Expression( Chain( (s,  m),       _, Category (f,_,_)  : [] ) : βs ))
        (Expression( Chain( (m', e), Derived, Selector (f',_,_) : γ  ) : αs ))
+
   | m ≡ m' ∧ f ≡ f'   = Just (Expression newExpr)
   | otherwise         = Nothing
   where newChain = Chain( (s, e), Derived, γ )
         newExpr  = [newChain] ⧺ αs ⧺ βs
+
 merge2 (Expression( Chain( (m', e), Derived, Selector (f',_,_) : γ  ) : αs ))
        (Expression( Chain( (s,  m),       _, Category (f,_,_)  : [] ) : βs ))
+
   | m ≡ m' ∧ f ≡ f'   = Just (Expression newExpr)
   | otherwise         = Nothing
   where newChain = Chain( (s, e), Derived, γ )
         newExpr  = [newChain] ⧺ αs ⧺ βs
+
 merge2 _ _ = Nothing
 
 -- merge two non-contiguous things with further requirements
 merge3 ∷ Expression → Expression → Maybe Expression
 merge3 (Expression( Chain( pos ,           _,   Category (f,_,_)  : γ : γs ) : βs ))
        (Expression( Chain( pos',           _,   Selector (f',_,_) : δ : δs ) : αs ))
+
   | f ≡ f'    = Just (Expression newExpr)
   | otherwise = Nothing
   where newChain  = Chain( pos , Derived , γ : γs )
         newChain' = Chain( pos', Derived, δ : δs )
         newExpr   = [newChain'] ⧺ αs ⧺ [newChain] ⧺ βs
+
 merge3 (Expression( Chain( pos',           _,   Selector (f',_,_) : δ : δs ) : αs ))
        (Expression( Chain( pos ,           _,   Category (f,_,_)  : γ : γs ) : βs ))
+
   | f ≡ f'    = Just (Expression newExpr)
   | otherwise = Nothing
   where newChain  = Chain( pos , Derived , γ : γs )
         newChain' = Chain( pos', Derived, δ : δs )
         newExpr   = [newChain'] ⧺ αs ⧺ [newChain] ⧺ βs
+
 merge3 _ _ = Nothing
 
 {-
@@ -602,6 +614,4 @@ recognizeTokens g = isJust ∘ parseTokens g
 --------------------------------------------------------------------------------
 
 
-parse        g = parseTokens        g ∘ tokenize
-partialParse g = partialParseTokens g ∘ tokenize
 recognize    g = recognizeTokens    g ∘ tokenize
