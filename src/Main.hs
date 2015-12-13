@@ -340,7 +340,7 @@ initialParseState ∷ Grammar → [Token] → ParseState
 initialParseState g tokens = (agenda, c)
   where
     -- Initially, the agenda and the chart are the same.
-    agenda            = concat emptyAxioms ⧺ concat lexicalAxioms
+    agenda            = reverse $ concat emptyAxioms ⧺ concat lexicalAxioms
     c                 = concat emptyAxioms ⧺ concat lexicalAxioms
     -- To compute this, we find all lexical items and null entries in
     -- the string.
@@ -515,7 +515,7 @@ adjoin2 g
   | otherwise          = Nothing
   where canAdjoin = f ∈ ad g f'
         newChain  = Chain( pos , Derived,                       γ : γs )
-        newChain' = Chain( pos', Derived, Category (f',i',j') : δ : δs )
+        newChain' = Chain( pos', Derived, Category (f',i',i) : δ : δs )
         newExpr   = [newChain'] ⧺ [newChain] ⧺ αs
 adjoin2 g
         (Expression( Chain( pos', _, Category (f',i',j') : δ : δs ) : αs ))
@@ -524,7 +524,7 @@ adjoin2 g
   | otherwise          = Nothing
   where canAdjoin = f ∈ ad g f'
         newChain  = Chain( pos , Derived,                       γ : γs )
-        newChain' = Chain( pos', Derived, Category (f',i',j') : δ : δs )
+        newChain' = Chain( pos', Derived, Category (f',i',i) : δ : δs )
         newExpr   = [newChain'] ⧺ [newChain] ⧺ αs
 adjoin2 _ _ _ = Nothing
 
