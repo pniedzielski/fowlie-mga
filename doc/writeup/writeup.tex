@@ -1,8 +1,18 @@
 \documentclass{article}
 \usepackage[T1]{fontenc}
 \usepackage[utf8x]{inputenc}
-\usepackage{amsmath,amssymb}
+\usepackage{amsmath,amssymb,amsthm}
+\usepackage{mathtools}
 \usepackage{hyperref}
+\usepackage{enumerate}
+\usepackage{semantic}
+\usepackage{tikz-qtree}
+\usepackage{titling}
+\setlength{\droptitle}{-7em}
+\usepackage{gb4e}
+\noautomath
+
+\newtheorem{mydef}{Definition}
 
 \begin{document}
 
@@ -13,20 +23,20 @@
 
 
 \title { Adjunction in Minimalism                                      }
-\author{ Patrick Niedzielski\footnote{
-           \href{mailto:pmn25@cornell.edu}{pmn25@cornell.edu}
-         }                                                             }
+\author{ Patrick Niedzielski \\
+  \href{mailto:pmn25@cornell.edu}{\texttt{pmn25@cornell.edu}}          }
 \maketitle
 
-\begin{abstract}
-  We present an critical analysis of three recent attempts to analyze
-  adjunction within Minimalist frameworks, discussing the syntactic,
-  semantic, and computational properties of each.
-
-  % TODO: Expand upon abstract once the paper is fully written.
-\end{abstract}
-
-\tableofcontents
+% \begin{abstract}
+%   The problem of adjunction has plagued Syntactic Theory since the
+%   adoption of Minimalism in the mid-90s.  Although the empirical
+%   properties of adjuncts are well understood, no analysis has been
+%   ever been widely accepted.  In this paper, we briefly discuss the
+%   syntactic properties of adjuncts and how early attempts fail to
+%   capture these properties.  We then discuss three recent attempts to
+%   account for adjunction within Minimalist frameworks, and then
+%   present a critical analysis of these accounts.
+% \end{abstract}
 
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -34,38 +44,912 @@
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 \section{Introduction}
 \label{sec:introduction}
 
-\section{Properties of Adjunction}
+Since the general acceptance of the Minimalist Program, and with it
+Bare Phrase Structure theory, Syntactic Theory has struggled to
+explain the common and empirically well-understood phenomenon of
+\textit{adjunction} of two constituents.  Adjunction is not a
+corner-case of syntax that can be easily ignored, but it does not seem
+simple to fit it into the existing \textbf{Merge} and \textbf{Move}
+machinery posited in most Minimalist frameworks.  This, combined with
+their transparency in further applications of \textbf{Merge} and
+\textbf{Move}, makes them a long-standing problem in Minimalism.
+Chametzky \cite{chametzky2003} uses this as an argument for the
+(undoubtedly intentionally provocative) claim that ``adjuncts have no
+syntax.''  We do not agree with the strength of this claim, and we
+will attempt to show that current research does indeed indicate that
+adjuncts can play well with Minimalist machinery.
+
+In this paper, we present a critical discussion of several recent
+Minimalist analyses of adjunction.  We first present a minimal set of
+syntactic properties of adjuncts that any account of adjunction should
+be able to explain.  These properties are widely accepted, and we
+present them here for exposition, as background for our analysis.  We
+then briefly discuss early Minimalist attempts to explain these
+properties and why they are inadequate.  Then, we present three recent
+accounts of adjunction within Minimalist frameworks---Meaghan Fowlie's
+\textit{Minimalist Grammars with Adjunction} (MGAs) \cite{fowlie2015},
+Norbert Hornstein's label-less adjunction account
+\cite{hornstein2008b}, and Tim Hunter's arguments and adjunction
+account \cite{hunter2011}---and analyze the benefits and drawbacks of
+each approach.  Finally, we will present some initial thoughts on
+where further study could be directed to draw from the benefits of all
+three approaches.
+
+During the course of this research, to gain more experience with
+Fowlie's MGA formalism, we implemented a CKY-like chart parser for
+MGAs.  We also discuss the high-level design of this chart parser and
+then discuss the process of implementing it in Appendix
+\ref{sec:implementation}.
+
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+\section{Syntactic Properties of Adjunction}
 \label{sec:adjunction-prop}
 
-\subsection{Syntactic Properties}
-\label{sec:syntactic-properties}
+Despite the general lack of consensus on an adequate and elegant
+treatment of adjunction in Minimalist theories of syntax, there is
+little contention about the empirical syntactic properties that
+adjuncts display.  We will briefly consider these properties here
+before looking at several accounts of adjuncts that attempt to capture
+and explain these properties.
 
-\subsection{Semantic Properties}
-\label{sec:semantic-properties}
+The basic set of syntactic properties of adjunction is discussed in
+\cite{fowlie2015} and is summarized here. Syntactically, adjuncts are
+subconstituents that are \textit{optional}, \textit{iterable}, and
+\textit{transparent to selection}.  Furthermore, adjuncts have a
+category, can be complex syntactic objects, and can only adjoin to
+target phrases of certain other, determined by the adjunct's category.
 
-\section{Early Approaches to Adjunction}
+\begin{exe}
+  \ex[]{The (small) cat. \hfill \textbf{Optionality}}
+  \ex[]{The small, small, small cat. \hfill \textbf{Iterability}}
+  \ex[]{
+    \begin{xlist}
+    \ex[]{\atcenter{
+          \arrowalign{[\textsubscript{DP}&\ A&\ [small&\ cat.]]\cr
+            & \fillright\vrule&\lf&\fillleft\pu\cr}
+        }}
+    \ex[]{\atcenter{
+          \arrowalign{[\textsubscript{DP}&\ $\varnothing$&\ [small&\ cats.]]\cr
+            & \fillright\vrule&\lf&\fillleft\pu\cr}
+        }}
+    \ex[*]{\atcenter{
+          \arrowalign{[\textsubscript{DP}&\ A&\ [small&\ cats.]]\cr
+            & \fillright\vrule&\lf&\fillleft\pu\cr}
+        } \hfill \textbf{Transparency to selection}}
+    \end{xlist}
+  }
+  \ex[]{
+    \begin{xlist}
+    \ex[]{The [\textsubscript{NP} [\textsubscript{AP} happy] boy]}
+    \ex[*]{He [\textsubscript{VP} [\textsubscript{AP} happy] runs]
+      \hfill \textbf{Target Categories}}
+    \end{xlist}
+  }
+\end{exe}
+
+These attributes distinguish adjunction from a feature-driven
+\textbf{Merge} between heads and arguments, à la Chomsky
+\cite{chomsky1995}.  Adjuncts are never required\footnote{Although
+  this has been disputed by Grimshaw and Vikner \cite{grimshaw1993},
+  who give the following data as examples of a contrast they claim
+  shows obligatory adjuncts:
+
+  \begin{exe}
+    \ex
+    \begin{xlist}
+    \ex[\#]{This house was built.}
+    \ex[]{This house was built last year.}
+    \end{xlist}
+    \ex
+    \begin{xlist}
+    \ex[\#]{A built house.}
+    \ex[]{A recently built house.}
+    \end{xlist}
+  \end{exe}
+
+  Goldberg and Ackerman \cite{goldberg2001} present a unified
+  pragmatic account of this data, as well as seemingly obligatory
+  adjuncts in middle voice constructions, arguing that the adjuncts
+  are not syntactically obligatory, and the contrast is due to
+  pragmatic contexts.}, unlike arguments which must be present to
+discharge $\theta$-roles and other selectional requirements.
+Similarly, once the selectional requirements of a head are met, there
+can be no further \textbf{Merge}s or \textbf{Move}s to satisfy them
+again, meaning that arguments, unlike adjuncts, are not iterable.
+Finally, when a head or projection selects for another syntactic
+object as an argument, it becomes the head of the new projection;
+adjuncts, however, which seem to ``select for'' another target
+syntactic object, do not become heads of the resulting structure,
+making them transparent to further \textbf{Merge}s and \textbf{Move}s.
+Hornstein and Nunes \cite{hornstein2008a} also give a similar set of
+requirements which describe the same empirical phenomena, assuming a
+GB or Minimalist framework, but not committing to any specific account
+of adjunction.% According to Hornstein and Nunes, adjunction:
+
+% \begin{enumerate}[(a)]
+% \item \label{hn-adj-prop-bar}
+%   preserves bar-level information of the target,
+% \item \label{hn-adj-prop-cat}
+%   preserves categorial information of the target,
+% \item \label{hn-adj-prop-head}
+%   preserves headedness of the target,
+% \item \label{hn-adj-prop-recurse}
+%   and has no upper bound on the number of times it can apply.
+% \end{enumerate}
+
+% These requirements imply directly optionality, iterability, and
+% transparency to selection.  Adjuncts are also necessarily iterable
+% under these requirements, as labeling information of the target is
+% preserved in the resulting adjunction structure by
+% (\ref{hn-adj-prop-bar}) and (\ref{hn-adj-prop-cat}), yielding a
+% structure that looks the same to further adjunction operations---of
+% which there may be an unbounded number, by
+% (\ref{hn-adj-prop-recurse}).  Finally, because (\ref{hn-adj-prop-bar})
+% and (\ref{hn-adj-prop-cat}) require the resulting adjunction structure
+% to have the same label as the target of adjunction, and because
+% (\ref{hn-adj-prop-head}) requires the $\phi$-features of the head to
+% propagate up to the new adjunction structure, the resulting structure
+% looks the same to further \textbf{Merge} and \textbf{Move} operations
+% as well, making it transparent to selection.
+
+In addition to the above core properties of adjunction, Fowlie
+\cite{fowlie2015} also notes that adjuncts may be either unordered or
+strictly ordered with one another, giving the following data as an
+examples:
+
+\begin{exe}
+  \ex
+  \begin{xlist}
+    \ex[]{ The alliance officer shot Kaeli [\textsubscript{PP} in the
+      cargo hold] [\textsubscript{PP} with a gun]. }
+    \ex[]{ The alliance officer shot Kaeli [\textsubscript{PP} with a
+      gun] [\textsubscript{PP} in the cargo hold]. \\
+      \hspace*{\fill} \textbf{Unordered adjuncts} }
+  \end{xlist}
+  \ex
+  \begin{xlist}
+    \ex[]{ \label{adjunct-order-normal} Wear the enormous ugly green hat. \\
+      \textit{Wear the hat that is enormous, ugly, and green.} }
+    \ex[\#]{ \label{adjunct-order-marked} Wear the ugly enormous green hat. \\
+      \textit{Of your enormous green hats, wear the ugly one.}  \\
+      \hspace*{\fill} \textbf{Strictly ordered adjuncts} }
+    \end{xlist}
+\end{exe}
+
+Fowlie further claims that there is a cross-linguistic hierarchy for
+strictly ordered adjuncts, corresponding to classes such as ``Size''
+and ``Goodness.''
+
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+\section{Approaches to Adjunction}
+\label{sec:approaches}
+
+In this section, we will briefly present a some early approaches to
+adjunction in Minimalist frameworks, and then present three recent
+Minimalist accounts of adjunction.
+
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+\subsection{Early Approaches to Adjunction}
 \label{sec:early-approaches}
 
-\section{Fowlie's Minimalist Grammars With Adjunction}
+% Pre-Minimalist approaches to adjuncts generally explained them as
+% maximal projections that attach at the X$'$ level (or in some
+% accounts, such as \cite{radford1988}, at any level) conserving
+% bar-level and categorial information.  This approach naturally and
+% straight-forwardly satisfies the criteria laid out by Hornstein and
+% Nunes in \cite{hornstein2008a} and reproduced in Section
+% \ref{sec:adjunction-prop} above.\footnote{Although it does run up
+%   against some problems within X-bar Theory itself, namely the desire
+%   that all projections project up from lexical items alone: does this
+%   mean the lexical item must know how many adjuncts are going to
+%   adjoin to it before the adjunctions happen?}
+
+With the introduction of the Minimalist Program in the mid-90s, and
+with the rejection of X-bar Theory in favor of Bare Phrase Structure
+(BPS), this simple account of adjunction was no longer possible.  In
+\textit{The Minimalist Program} \cite{chomsky1995}, Chomsky notes this
+and presents a work-around within BPS to account for adjuncts:
+
+\begin{quotation}
+  \noindent
+  But adjunction forms a different object.  \dots Therefore, there
+  must be an object constructed from $K$ but with a label distinct
+  from its head $H(K)$.  One minimal choice is the ordered pair
+  $\langle H(K), H(K) \rangle$.  We thus take $L = \{ \langle H(K),
+  H(K) \rangle, \{ \alpha, K \} \}.$
+\end{quotation}
+
+Chomsky leaves this line of reasoning with the above unfulfilling
+conclusion, which seems neither minimal nor in-line with the empirical
+properties we noted in Section \ref{sec:adjunction-prop}, failing to
+capture transparency to selection elegantly.  Because the result of
+adjunction has a different label than its target, both it and the
+target can be selected for.  But this means any lexical item that
+selects for the $H(K)$ must also select for
+$\langle H(K), H(K) \rangle$---a duplication that hardly seems
+motivated.
+
+Another early account of adjuncts was done within the context of Ed
+Stabler's Minimalist Grammars (MGs) \cite{stabler2001}, a Minimalist
+mathematical formalism that uses feature-driven \textbf{Merge} and
+\textbf{Move} as the two structure-building operations.  Within this
+approach, presented in \cite{fowlie2015} as the ``traditional MG
+solution,'' the adjuncts themselves are modified, instead of the
+\textbf{Merge} operation.  Adjuncts of a category \texttt{X} are said
+to have features \texttt{=XX}$\gamma$; this allows them to combine
+with \texttt{X} and produce an \texttt{X} as a result.  In doing so,
+though, they do not preserve the headedness of the original
+\texttt{X}---instead, the adjunct itself becomes the head!
+Furthermore, there is no labeling here of the adjunct itself, meaning
+adjuncts cannot be selected for: without duplicating lexical entry for
+the adjunct with different feature set, there is no way for the
+adjunct to be a complement of any other phrase (as an adjective,
+usually an adjunct, might be if it is in a predicate).
+
+Both of these approaches suffer from intractable empirical or
+theoretical problems, so we turn our attention to more recent accounts
+of adjunction.
+
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+\subsection{Fowlie's Minimalist Grammars With Adjunction}
 \label{sec:fowlie-mga}
 
-\subsection{Chart Parsing MGAs}
-\label{sec:chart-parsing-mga}
+In her 2015 dissertation \cite{fowlie2015}, Meaghan Fowlie approaches
+the problem of adjunction from a computational perspective, building
+on MGs.  In order to account for the properties we discussed in
+Section \ref{sec:adjunction-prop}, Fowlie introduces a new structure
+building operation, \textbf{Adjoin}, whose definition is reproduced
+here as Definition \ref{def:adjoin}.  This new operation adjoins
+either an adjunct and its adjacent target, or a non-adjacent
+adjunct-target pair that results from movement.
 
-\section{Hornstein's Label-less Adjuncts}
+\begin{mydef}[Adjoin]
+\label{def:adjoin}
+  Let $s,t \in \Sigma$ be strings, $Y,X \in \mathbf{sel}$ be
+  categories, $i, j, m, n \in \mathbb{N}$,
+  $mvrs \in (\Sigma^{*} \times F^{*})^{*}$ be a mover list, and
+  $\alpha, \beta \in F^{*}$.
+  \begin{align*}
+    & \mathbf{Adjoin}(
+      \langle s, [\mathtt{X}, \mathtt{i}, \mathtt{j}]\alpha, mvrs \rangle,
+      \langle t, [\mathtt{Y}, \mathtt{n}, \mathtt{m}]\beta \rangle
+      ) \\
+    = &\begin{dcases*}
+      \langle ts, [\mathtt{X}, \mathtt{i}, \mathtt{n}]\alpha \rangle, mvrs
+      & if $\mathtt{n} \geq \mathtt{j}$ and $\mathtt{Y} \in \mathbf{Ad}(\mathtt{X})$ and $\beta = \epsilon$ \\
+      \langle s, [\mathtt{X}, \mathtt{i}, \mathtt{n}]\alpha \rangle, \langle t, \beta \rangle, mvrs
+      & if $\mathtt{n} \geq \mathtt{j}$ and $\mathtt{Y} \in \mathbf{Ad}(\mathtt{X})$ and $\beta = \epsilon$
+    \end{dcases*}
+  \end{align*}
+\end{mydef}
+
+In order to prevent any category of phrase from adjoining to any other
+category of phrase, Fowlie introduces a function
+$\mathbf{Ad}(\mathtt{X})$ into the grammar that takes in the category
+of the target phrase and returns a set of all categories of adjuncts
+that can adjoin to the target phrase.  Then, \textbf{Adjoin} just
+checks whether the adjunct's category is in $\mathbf{Ad}(target)$
+before adjoining.  If, for instance, a grammar defines
+$\mathbf{Ad}(\mathtt{N}) = \{ \mathtt{A, P} \}$, \textbf{Adjoin} can
+adjoin adjectival and prepositional phrases to noun phrases, but no
+other adjunctions are possible.
+
+Finally, to account for both unordered adjuncts and adjuncts with
+strict ordering, Fowlie expands the type of categories to include two
+\textit{indices} that describe, respectively, what level in the
+hierarchy this adjunct belongs to, and what level the last adjunct to
+the phrase belonged to.  For example, if ``Size'' adjuncts are to be
+ordered before ``Goodness'' adjuncts, we can let the index \texttt{1}
+correspond to ``Size'' adjuncts and \texttt{2} to ``Color'' adjuncts.
+Then, given the lexical entries
+$\textit{wolf} :: [\mathtt{N}, \mathtt{0}, \mathtt{0}]$,
+$\textit{bad} :: [\mathtt{A}, \mathtt{1}, \mathtt{0}]$, and
+$\textit{big} :: [\mathtt{A}, \mathtt{2}, \mathtt{0}]$, we can
+disallow the derivation shown in Figure \ref{fig:fowlie-order-bad},
+which tries to adjoin a ``Goodness'' adjunct to a phrase that had
+already been adjoined to a ``Size'' adjunct.
+
+\begin{figure}[h]
+  \centering
+
+  \begin{tikzpicture}
+      \Tree
+      [.*[\texttt{N},\texttt{0},\textit{?}]
+        [.[\texttt{A},\texttt{1},\texttt{0}] bad ]
+        [.[\texttt{N},\texttt{0},\texttt{2}]
+          [.[\texttt{A},\texttt{2},\texttt{0}] big ]
+          [.[\texttt{N},\texttt{0},\texttt{0}] wolf ] ] ]
+    \end{tikzpicture}
+
+    \caption{A disallowed MGA derivation with strictly ordered
+      adjuncts.  The final \textbf{Adjoin} is not allowed, as it tries
+      to adjoin an adjunct with index \texttt{1} to a phrase that has
+      already adjoined an adjunct with index \texttt{2}.}
+  \label{fig:fowlie-order-bad}
+\end{figure}
+
+Fowlie shows that MGAs are weakly equivalent to MGs (that is, that
+they describe the same set of languages).  MGAs are not strongly
+equivalent to MGs, as they introduce a new operation, so their
+derivations will not be isomorphic.
+
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+\subsection{Hornstein's Label-less Adjuncts}
 \label{sec:hornstein-adjuncts}
 
-\section{Hunter's Adjuncts and Arguments}
+In his book \textit{A Theory of Syntax} \cite{hornstein2008b},
+Hornstein approaches adjunction from a different, more theoretical
+perspective.  Hornstein initially describes what he calls Darwin's
+Problem, namely that the seemingly complex Faculty of Language (FL)
+evolved in a very short amount of time on an evolutionary scale.
+Hornstein lays out a plan to simplify FL by reducing complex
+operations to simpler components and removing those which he considers
+epiphenomenal, such as C-Command and the A-over-A Condition.  In
+particular, Hornstein decomposes \textbf{Merge} into a sequence of two
+operations, \textbf{Concatenate} (denoted by $\widehat{}\;$), which
+takes two syntactic atoms and returns an ordered concatenate, and
+\textbf{Label}, which takes a concatenate and prevents its
+constituents from being reconcatenated, yielding a new syntactic atom.
+An example of this process is shown in (\ref{hornstein-merge}).
+Hornstein's claim is that of the fundamental operations he identifies,
+\textbf{Label} is the recent evolutionary innovation.
+
+\begin{exe}
+  \ex[]{ \label{hornstein-merge}
+    \begin{xlist}
+      \ex{} \textit{see the ball} \hfill \textbf{Surface form}
+      \ex{} the $\widehat{}$ ball \hfill \textbf{Concatenate}
+      \ex{} [\textsubscript{the} the $\widehat{}$ ball] \hfill
+      \textbf{Label}
+      \ex{} see $\widehat{}$ [\textsubscript{the} the $\widehat{}$
+      ball] \hfill \textbf{Concatenate}
+      \ex{} [\textsubscript{see} see $\widehat{}$ [\textsubscript{the}
+      the $\widehat{}$ ball]] \hfill \textbf{Label}
+    \end{xlist}
+  }
+\end{exe}
+
+Within this framework, Hornstein tackles the problem of adjunction,
+arguing that it is actually a simpler operation than \textbf{Merge},
+being composed of a \textbf{Concatenate} and then an \emph{optional}
+\textbf{Label}.  The possible structures for the surface form
+\textit{run in the house} and \textit{run in the house with scissors}
+under this story are given in
+(\ref{hornstein-adjoin1}--\ref{hornstein-adjoin2}).  By allowing
+adjuncts to be part of either labeled or unlabeled structures,
+Hornstein is able to explain how adjuncts can either be pied-piped or
+stranded during movement as simply a structural ambiguity in the
+derivation, such that stranded adjuncts are necessarily unlabeled.
+
+\begin{exe}
+  \ex[]{ \label{hornstein-adjoin1}
+    \begin{xlist}
+      \ex{} run $\widehat{}$ in-the-house
+      \ex{} [\textsubscript{run} run $\widehat{}$ in-the-house]
+    \end{xlist}
+  }
+  \ex[]{ \label{hornstein-adjoin2}
+    \begin{xlist}
+      \ex{}
+      \setlength{\tabcolsep}{0.2em}
+      \begin{tabular}{rl}
+        run & $\widehat{}$ in-the-house \\
+            & $\widehat{}$ with-scissors \\
+      \end{tabular}
+      \ex{} [\textsubscript{run} run $\widehat{}$ in-the-house]
+      $\widehat{}$ with-scissors
+      \ex{} [\textsubscript{run} [\textsubscript{run} run $\widehat{}$
+      in-the-house] $\widehat{}$ with-scissors]
+    \end{xlist}
+  }
+\end{exe}
+
+Hornstein argues that arguments require labels because, by
+stipulation, \textbf{Label} discharges $\theta$-roles and other
+argument-relational features.  Because adjuncts do not have such
+relational notations, they can be interpreted at the semantics
+interface exclusively by their concatenation.  Arguments thus need to
+form a complex syntactic atom (and thus must be \textbf{Merge}d), but
+adjuncts can simply be \textbf{Concatenate}d.
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+\subsection{Hunter's Adjuncts and Arguments}
 \label{sec:hunter-adjuncts}
 
+Tim Hunter's 2011 book \textit{Syntactic Effects of Conjunctivist
+  Semastics: Unifying movement and adjunction} \cite{hunter2011}
+explores adjunction from a semantically-informed view, building on a
+modified MG-like syntactic formalism.  Hunter first takes the MG
+formalism presented in, e.g. \cite{stabler2001}, with \textbf{Merge}
+(in Hunter, \textsc{e-mrg} ``external merge'') and \textbf{Move}
+(\textsc{i-mrg}, ``internal/re-merge'').  He then notes that this
+formalism adds a great deal of unnecessary structure---namely, once we
+have merged together two adjacent constituents, the only information
+that is relevant is the phrase as a whole, not the derivation.  Hunter
+simplifies \textsc{e-mrg} of adjacent constituents by discarding the
+structure and simply concatenating the constituents together.
+\textsc{i-mrg} does the same with movers.  As a final step, Hunter
+decomposes \textsc{e-mrg} and \textsc{i-mrg} into an insertion
+operation, which he calls \textsc{ins} ``insert'' and which inserts a
+constituent into the movers of another expression, a feature-checking
+operation called \textsc{mrg}, which concatenates adjacent movers, and
+a semantic interpretation operation called \textsc{spl} ``spellout''.
+This allows Hunter to remove the difference between \textsc{e-mrg} and
+\textsc{i-mrg}, and paves the way for Hunter to give an account of
+adjuncts.
+
+With a syntactic formalism as a basis, Hunter approaches the question
+of adjunction from a specific interpretation of Neo-Davidsonian
+logical forms, where each constituent that is merged in denotes a
+one-place predicate, and merging results in an \emph{ordered}
+conjunction of these predicates to form a new one-place predicate.
+Hunter argues that under this view, an adjunct has a denotation that
+is already a one-place predicate, and does not need to be modified,
+whereas an argument is a multi-place predicate that must be made a
+one-place predicate based on its syntactic position.  Thus, an adjunct
+can be merged in at different levels in the syntactic structure and
+still result in the same semantic interpretation, as long as the order
+of the conjuncts in the final logical form is the same.
+
+Hunter then defines a separate set of adjunction features \texttt{*f},
+which are able to adjoin to attractors of \texttt{f}.  A lexical item
+with a \texttt{*f} feature does not undergo \textsc{mrg}, as it does
+not need feature checking and does not need to be made into a
+one-place predicate.  An adjunct can thus only undergo \textsc{ins}
+and \textsc{spl}, whereas an argument must undergo all three.
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 \section{Analysis of Recent Approaches to Adjunction in Minimalism}
 \label{sec:analysis}
 
-\section{Conclusion}
+Fowlie, Hornstein, and Hunter all approach the problem of adjunction
+from different perspectives: Fowlie from an MG perspective, Hornstein
+from a very Minimalist perspective, and Hunter from a neo-Davidsonian
+perspective.  Hornstein and Hunter come up with very similar
+approaches, that mirror each other in several ways: they both first
+decompose traditional operations into very similar fundamental ones,
+they unify \textbf{Merge} and \textbf{Move}, and they conclude that
+\textbf{Adjoin} is a simpler operation than either \textbf{Merge} or
+\textbf{Move}, which Hunter shows independent evidence for in the
+semantics.  Both approaches are attractive, though Hornstein's is more
+radical, and satisfy the desiderata we put forth in Section
+\ref{sec:adjunction-prop}.  In particular, Hunter's comprehensive
+treatment of the semantics of adjuncts provides compelling evidence
+for this line of research, and his basis in the MG formalism indicates
+that it could still describe the same set of languages as MGs/MCFGs.
+
+Hornstein's approach requires you to fully buy into his framework to
+even begin to explain adjuncts, and his framework is rather novel.
+Furthermore, his discussion of this framework lacks the formality
+necessary to judge it on a computational basis.  Some important
+details are not discussed, such as the ordering of multiple adjuncts
+to a single target---these would need to be formalized to make strong
+claims about both Hornstein's framework and his approach to
+adjunction.  Moreover, Hornstein does not make it clear why adjuncts
+should be allowed to be labeled at all---if there is no difference in
+the semantics, why should extra work be done in some cases, but not
+others?  Hunter specifically rejects Hornstein's explanation on this
+basis.
+
+Unlike Hornstein and Hunter, Fowlie's approach handles both unordered
+and ordered adjuncts, but it does so at a cost: it introduces the need
+for counting into the FL, something which many syntacticians have
+avoided on theoretical grounds\footnote{See \cite{hornstein2008b} for
+  a discussion of this.}.  Fowlie claims that to handle ordered
+adjuncts this (or something analogous) is necessary.  In particular,
+though, it seems that Fowlie has introduced a generalized
+subcategorization means that only appears in a restricted part of the
+grammar---\textit{generalized} because it allows an adjunct to select
+for a target phrase that has already adjoined to an adjunct of any
+subcategory (index) less than it in the hierarchy, and
+\textit{restricted} because this is only able to occurs in adjunction.
+Compared with Hornstein and Hunter's approaches, where adjunction is a
+simpler operation than argument merging, this seems undesired.
+
+On the other hand, Fowlie's model does allow for a more traditional
+explanation for explaining the contrast between the examples
+(\ref{adjunct-order-normal}--\ref{adjunct-order-marked}), reproduced
+here:
+
+\begin{exe}
+  \exr{adjunct-order-normal}[]{ Wear the enormous ugly green hat. \\
+    \textit{Wear the hat that is enormous, ugly, and green.} }
+  \exr{adjunct-order-marked}[\#]{ Wear the ugly enormous green hat. \\
+    \textit{Of your enormous green hats, wear the ugly one.} }
+\end{exe}
+
+(\ref{adjunct-order-marked}) is not \emph{ungrammatical} here---it's
+simply \emph{marked}, and pragmatically anomalous in a neutral
+context.  If we assume a $\varnothing_{foc}$ lexical item that
+licenses movement within a noun phrase of adjectival adjuncts, we can
+capture this in the syntactic structure.  Such a derivation for
+(\ref{adjunct-order-marked}) might look as follows:
+
+\begin{exe}
+  \ex Wear the [\textsubscript{FocP} ugly $\varnothing_{foc}$
+  [\textsubscript{NP} enormous <ugly> green hat]].
+\end{exe}
+
+Within an MGA, we could make a lexical item $\epsilon$ : \texttt{=N
+  +Afoc [Foc,0,0]} and a lexical item \textit{ugly} : \texttt{[A,2,0]
+  -Afoc}; the partial derivation of (\ref{adjunct-order-marked}) would
+follow this series of steps:
+
+\begin{enumerate}
+\item \textbf{Adjoin} adjacent \textit{green} and \textit{hat} to form
+  \texttt{N} at level \texttt{1}.
+\item \textbf{Adjoin} nonadjacent \textit{ugly} and \textit{green hat}
+  to form \texttt{N} at level \texttt{2} with \textit{ugly} as a
+  mover.
+\item \textbf{Adjoin} adjacent \textit{enormous} and \textit{green
+    hat, ugly} to form \texttt{N} at level \texttt{3} with
+  \textit{ugly} as a mover.
+\item \textbf{Merge} adjacent $\epsilon$ and \textit{enormous green
+    hat, ugly} to form \texttt{+Afoc Foc}.
+\item \textbf{Move} \textit{$\epsilon$ enormous green hat, ugly} to
+  cancel \texttt{+Afoc} and \texttt{-Afoc} to form \texttt{Foc}.
+\item \textbf{Merge} adjacent \textit{the} and \textit{ugly $\epsilon$
+    enormous green hat} to form \texttt{D}.
+\item \dots
+\end{enumerate}
+
+The presence of this $\varnothing_{foc}$ captures the marked nature of
+this order.  Unfortunately, such a solution requires duplication in
+the lexicon: every adjectival adjunct would need an entry with
+\texttt{-Afoc} to be licensed for focus movement and an entry without
+\texttt{+Afoc}, to still capture the default order.
+
+Despite this, MGAs show a very important computational result: it is
+efficiently recognizition algorithms are possible for adjunction
+structures that satisfy all the properties discussed in Section
+\ref{sec:adjunction-prop}.  Fowlie shows that MGAs are weakly
+equivalent to Multiple Context Free Grammars (MCFGs) \cite[Lemma
+7.8.4]{fowlie2015} by introducing a set of transformations from the
+fundamental operations \textbf{Merge}, \textbf{Move}, and
+\textbf{Adjoin} to MCFG rules; these transformations generate a set of
+MCFG rules whose size is polynomial in the number of categorial and
+licensing features in the MGA and in the maximum index of any lexical
+item in the MGA.  It is known that MCFGs can be parsed in polynomial
+time on the length of the string (shown in \cite[Theorem
+3.10]{seki1991}, given tighter bounds in \cite{nakanishi1997}); as the
+number of MCFG rules generated by a the transformation of an arbitrary
+MGA is independent of the length of the string, the recognition
+problem for MGAs reduces to the recognition problem for MCFGs, and it
+is possible to decide whether a string is generated by a given MGA in
+polynomial time.  This finding supports the conclusion that human
+language is efficiently parsable while still holding the theoretical
+and empirical properties we discussed in Section
+\ref{sec:adjunction-prop}.  Such a finding is compelling, as it
+indicates that Hunter's MG-informed approach could likely be
+efficiently parsable as well; because Hunter's approach is so similar
+to Hornstein's, Hornstein's theory is potentially efficiently parsable
+as well.  It seems, then, that these three accounts are approaching
+something fundamental about adjunction in human language, which fits
+in with our current ideas about the computational complexity of human
+language.
+
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+\section{Areas of Further Study}
 \label{sec:conclusion}
+
+Because of the limited time available to work on this project, we were
+only able to research the three accounts of adjunction presented here,
+not extend any of them.  Given more time, though, this research
+outlines a possible set of next steps that could combine the benefits
+of the three approaches.
+
+Because of the strong evidence that Hunter gives, and because he gives
+it in a formal enough way that it could be judged on a computational
+basis, it seems like an interesting avenue of further study.  Its
+ideas are similar to Hornstein's, which were arrived at from a
+completely different directly; this lends support to its approach as
+well.  As a program of further study, implementing a parser for
+Hunter's formalism and then working to extend this with Fowlie's
+strictly ordered adjunction strategy would combine the benefits of
+both strategies.  For such a combination to work, Hunter's
+\textsc{ins} operation would need to check the indices of its two
+arguments, and \textsc{mrg} would have to combine them.  Whether this
+maintains all the properties of Hunter's formulation is not
+immediately clear.
+
+Another possible direction would be to formalize an approach along the
+lines of Hornstein.  Such an approach would necessarily be
+comprehensive, and it would have to address the problems described
+above.  In particular, it would have to wrestle further with the
+ordering of multiple adjuncts and come up with an explanation for
+\textbf{Label} appears to be optional, neither required nor
+disallowed.
+
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%                                                          BACK MATTER %
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+
+\appendix
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+\section{Chart Parsing MGAs: An Implementation Guide to
+  \texttt{fowlie-mga}}
+\label{sec:implementation}
+
+Just like MGs, MGAs lend themselves nicely to a CKY-like chart parsing
+algorithm.  During the research for this project, we implemented a
+recognizer based on a chart parser for MGAs to get a greater
+understanding of the MGA formalism.  This implementation is
+freely-licensed and
+\href{https://github.com/pniedzielski/fowlie-mga}{available online as
+  \texttt{fowlie-mga}}.  The recognizer is a bottom-up CKY-like
+recognizer, and thus views recognizing an input string as performing
+deduction on axioms representing the lexical items in the string.
+
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+\subsection{High-Level Design}
+\label{sec:implementation-design}
+
+The recognizer is a inference-based chart parser that accepts a string,
+tokenizes it by splitting on whitespace, and attempts to deduce the
+start symbol of a grammar using the lexical items that appear inside
+the string as axioms.
+
+One of the inputs to the recognizer is a grammar that contains a list
+of start symbols that should be considered valid end states, a list of
+lexical items that appear inside the lexicon, and an association list
+that represents the \textbf{Ad} mapping from target categories to
+valid adjunct categories. Each lexical item contains an orthographic
+representation (normalized to lowercase letters with no whitespace,
+and $\epsilon$ if the lexical item is null) and an ordered sequence of
+features: \texttt{Category} (\texttt{X}) and \texttt{Selector}
+(\texttt{=X}) govern \textbf{Merge}, and \texttt{Licensor}
+(\texttt{+X}) and \texttt{Licensee} (\texttt{-X}) govern
+\textbf{Move}.  Selectional features additionally carry index
+information required to model strictly ordered adjuncts.
+
+The parser functions similarly to that described in
+\cite{stabler2001}, with partial parses stored in a \texttt{Chain}
+that contains their start and end positions within the input string,
+whether they are lexical items or derived syntactic objects, and an
+ordered list of features that still have to be checked for the
+derivation to succeed.  Each inference rule operates on non-empty
+lists of \texttt{Chain}s called \texttt{Expression}s, whose head
+represents the head of the parse and whose tail represent ``movers''
+that still have to be removed through an application of
+\textbf{Move}.  The agenda and chart are unordered lists of these
+\texttt{Expression}s, and together form the \texttt{ParseState}.
+
+Before the inference engine is run, we axiomize the agenda and chart
+using the \texttt{initialParseState} function, which adds all
+recognized lexical items in the string to the chart and agenda, as
+well as adds all empty lexical items at all the places they could
+occur (that is, before or after any token in the input string).  We
+then iteratively infer on this initial \texttt{ParseState} until we
+deplete the agenda by calling \texttt{inferAll}.
+
+\texttt{inferAll} generates a lazy list where each element has one
+further inference than the last.  It then searches through until it
+finds the first element with no more items in the agenda.  Each
+inference step along the way generates a list of every possible
+conclusion we can form, preferring \textbf{Move} inference rules to
+\textbf{Merge} and \textbf{Adjoin}, and selects the first one that we
+haven't previously inferred.  If an inference is made, then it is
+added to the chart and the agenda.  Otherwise, the item we are trying
+to infer on is removed from the agenda, and the next item is tried.
+This ensures that the inference engine always either makes forward
+progress or terminates.
+
+The functions that model the inference rules were direct
+representations of the inference rules shown in Figures
+\ref{fig:mg-cky-inference} and \ref{fig:mga-cky-inference}.
+
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+\subsection{Implementation Postmortem}
+\label{sec:implementation-postmortem}
+
+Because MGAs are MGs with an additional \textbf{Adjoin} operation, we
+decided a good first step would be implementing a recognizer for MG
+languages.  Such a recognizer would be less complex, quicker to write,
+and easier to understand, all of which make for a good prototype
+implementation.  Furthermore, the inference rules for deductively
+parsing MGs are well-described online and in the literature (for
+example, in \cite{stabler2001}, \cite{harkema2001}, \cite{dost2011},
+and \cite{sportiche2013}), and so implementing only an MG recognizer
+first would allow me to make use of these resources without additional
+complications.  The inference rules for parsing MGs, taken from
+\cite{stabler2001} and reproduced in Figure
+\ref{fig:mg-cky-inference}, formed the basis for the MG parser.
+
+\begin{figure}[h]
+  \centering
+  \[
+    \inference[merge1]{
+      (a, b) :: \text{=}f \gamma &
+      (b, c) \cdot f, \alpha_1, \dots, \alpha_k
+    }{
+      (a, c) : \gamma, \alpha_1, \dots, \alpha_k
+    }
+  \]
+  \[
+    \inference[merge2]{
+      (b, c) : \text{=}f \gamma, \alpha_1, \dots, \alpha_k &
+      (a, b) \cdot f, \iota_1, \dots, \iota_l
+    }{
+      (a, c) : \gamma, \alpha_1, \dots, \alpha_k, \iota_1, \dots, \iota_l
+    }
+  \]
+  \[
+    \inference[merge3]{
+      (a, b) \cdot \text{=}f \gamma, \alpha_1, \dots, \alpha_k &
+      (c, d) \cdot f \delta, \iota_1, \dots, \iota_l
+    }{
+      (a, b) : \gamma, \alpha_1, \dots, \alpha_k, (c, d) : \delta, \iota_1, \dots, \iota_l
+    }
+  \]
+  \[
+    \inference[move1]{
+      (b, c) : +g \gamma, \alpha_1, \dots, \alpha_{i-1}
+      (a, b) : -g, \alpha_{i+1}, \dots, \alpha_k
+    }{
+      (a, c) : \gamma, \alpha_1, \dots, \alpha_{i-1}, \alpha_{i+1}, \dots, \alpha_k
+    }
+  \]
+  \[
+    \inference[move2]{
+      (a, b) : +g \gamma, \alpha_1, \dots, \alpha_{i-1}
+      (c, d) : -g \delta, \alpha_{i+1}, \dots, \alpha_k
+    }{
+      (a, b) : \gamma, \alpha_1, \dots, \alpha_{i-1}, (c, d) : \delta, \alpha_{i+1}, \dots, \alpha_k
+    }
+  \]
+  \caption{CKY inference rules for MGs.  These inference rules are
+    defined with an input string of length $N$ on any positions
+    $0 \leq a,b,c,d \leq N$, types $\cdot \in \{ :, :: \}$, categorial
+    features $\{f\}$, licensing features $\{g\}$, possibly empty
+    sequences of features $\gamma, \delta$, and chains
+    $\alpha_1, \dots, \alpha_k; \iota_1,\dots,\iota_l$ for
+    $k, l \geq 0$.}
+  \label{fig:mg-cky-inference}
+\end{figure}
+
+Implementing the a deductive chart parser was the most challenging
+part of implementing the MGA recognizer, and during the MG phase of
+the project, we had several false starts that turned out to be the
+wrong way to go.  In particular, these stemmed from a misunderstanding
+of the role of the agenda in a deductive chart parser: because the
+agenda is implicit in the standard CKY algorithm and is captured in
+the way the algorithm iterates through the chart, we first thought an
+MG chart parser could play a similar trick, simply iterating through
+the chart in the right order to check all possible inferences.  The
+first implementation tried this and did not produce the correct
+output; it wasn't until we formalized the loop invariants in the
+CKY-like algorithm we were using that we found this was the source of
+the error, and we implemented it using a separate, explicit agenda
+data structure.  Later, we found we were placing results in the
+incorrect location in our two-dimensional CKY-like chart.  Such a
+chart makes less sense in an MG recognizer with movers, and it was
+less intuitive to use in an MG recognizer than it had been in our CFG
+recognizer.  We decided to abandon this chart in favor of a simple
+list data structure representing a set.  Although this added an
+additional linear search to every lookup, it allowed us to use
+\texttt{Data.List} module functionality and the list monad, which made
+the code clearer and easier to work with.  As performance was not our
+goal, our grammars were simple, and our input strings were short, we
+found this to be a reasonable trade-off.  A data structure with
+sub-linear lookup could be used if this were found to be unreasonably
+slow, or the more classical approach of considering the chart a graph
+could be considered.
+
+Once we had a working MG recognizer, we modified the code to make it
+recognize MGAs.  There we three parts to this modification: we needed
+to add the inference rules required to implement \textbf{Adjoin}, we
+needed to modify the chart entries and grammars to contain indices
+needed by \textbf{Adjoin}, and we needed to modify inference
+application to apply the new \textbf{Adjoin} operations.  The
+inference rules, shown below in Figure \ref{fig:mga-cky-inference},
+were created by analogy with those of the the \textbf{Merge}
+operation, to which they are conceptually quite similar.  There is no
+need for an inference rule analogous to merge1 (the complement merging
+inference rule), because by stipulation, we order all adjuncts before
+their heads, as per \cite{fowlie2015}.  Implementing these was
+straight-forward.
+
+\begin{figure}[h]
+  \centering
+  % \[
+  %   \inference[merge1]{
+  %     (a, b) :: \text{=}f \gamma &
+  %     (b, c) \cdot [f,i',j'], \alpha_1, \dots, \alpha_k
+  %   }{
+  %     (a, c) : \gamma, \alpha_1, \dots, \alpha_k
+  %   }
+  % \]
+  % \[
+  %   \inference[merge2]{
+  %     (b, c) : \text{=}f \gamma, \alpha_1, \dots, \alpha_k &
+  %     (a, b) \cdot [f,i,j], \iota_1, \dots, \iota_l
+  %   }{
+  %     (a, c) : \gamma, \alpha_1, \dots, \alpha_k, \iota_1, \dots, \iota_l
+  %   }
+  % \]
+  % \[
+  %   \inference[merge3]{
+  %     (a, b) \cdot \text{=}f \gamma, \alpha_1, \dots, \alpha_k &
+  %     (c, d) \cdot [f,i,j] \delta, \iota_1, \dots, \iota_l
+  %   }{
+  %     (a, b) : \gamma, \alpha_1, \dots, \alpha_k, (c, d) : \delta, \iota_1, \dots, \iota_l
+  %   }
+  % \]
+  % \[
+  %   \inference[move1]{
+  %     (b, c) : +g \gamma, \alpha_1, \dots, \alpha_{i-1}
+  %     (a, b) : -g, \alpha_{i+1}, \dots, \alpha_k
+  %   }{
+  %     (a, c) : \gamma, \alpha_1, \dots, \alpha_{i-1}, \alpha_{i+1}, \dots, \alpha_k
+  %   }
+  % \]
+  % \[
+  %   \inference[move2]{
+  %     (a, b) : +g \gamma, \alpha_1, \dots, \alpha_{i-1}
+  %     (c, d) : -g \delta, \alpha_{i+1}, \dots, \alpha_k
+  %   }{
+  %     (a, b) : \gamma, \alpha_1, \dots, \alpha_{i-1}, (c, d) : \delta, \alpha_{i+1}, \dots, \alpha_k
+  %   }
+  % \]
+  \[
+    \inference[adjoin1]{
+      (a, b) \cdot [f,i,j] &
+      (b, c) \cdot [f',i',j'] \gamma, \alpha_1, \dots, \alpha_k
+    }{
+      (a, c) : [f', i', i]\gamma, \alpha_1, \dots, \alpha_k
+    }[iff $f \in \mathbf{Ad}(f')$ and $i \geq j'$]
+  \]
+  \[
+    \inference[adjoin2]{
+      (a, b) \cdot [f,i,j] \gamma &
+      (c, d) \cdot [f',i',j'] \delta, \alpha_1, \dots, \alpha_k
+    }{
+      (c, d) : [f', i', j']\delta, (a, b) : \gamma, \alpha_1, \dots, \alpha_k
+    }[iff $f \in \mathbf{Ad}(f')$ and $i \geq j'$]
+  \]
+  \caption{Additional CKY inference rules for MGAs.  The same
+    inference rules in \ref{fig:mg-cky-inference} are used for
+    \textbf{Merge} and \textbf{Move}, and these additional adjoin1 and
+    adjoin2 rules are modelled after the \textbf{Merge} rules.}
+  \label{fig:mga-cky-inference}
+\end{figure}
+
+Because of the roundabout way we arrived at current implementation of
+the inference engine, it required small modifications to support MGAs:
+inference rules are hard-coded instead of passed in to the engine,
+types are hard-coded instead of abstracted away through typeclasses,
+and merge and move had to be changed when the grammar changed,
+indicating that we had the incorrect level of abstraction.  A
+refactoring that separates the inference engine from any specifics of
+the MGs or MGAs and that separates the inference rules from the
+representation of the grammar would make the code cleaner and easier
+to understand.  It would prevent us from using pattern matching in the
+inference rules, though; this could still be abstracted away as
+functions that the grammar exposes.
+
+Initially, we had planned to implement a complete parser that would
+return either a parse tree or an ordered list of \textbf{Move},
+\textbf{Merge}, and \textbf{Adjoin} operations that generate the given
+input, not just a recognizer.  This would not have been too much
+additional work over the recognizer, but we felt that it would not
+help in our goal of gaining a greater understanding of MGAs as a
+formalism.  Indeed, transforming the recognizer into a parser would
+not have resulted in any changes to the MGA-specific part of the
+code base, only to the inference engine.
 
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -76,7 +960,7 @@
 \cleardoublepage
 \phantomsection
 \addcontentsline{toc}{section}{References}
-\nocite{*}
+%\nocite{*}
 \bibliographystyle{alpha}
 \bibliography{writeup}
 
